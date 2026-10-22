@@ -34,7 +34,8 @@ os.makedirs(os.path.join(ROOT, DRAW_DIR), exist_ok=True)
 for f in glob.glob(os.path.join(HERE, "*.kt")):
     shutil.copy(f, os.path.join(ROOT, KT_DIR, os.path.basename(f)))
 for f in ("ic_sync.xml", "ic_clipsync_launcher.xml", "clipsync_all_apps.xml",
-          "clipsync_all_apps_pressed.xml", "tb_all_apps_button_icon.xml"):
+          "clipsync_all_apps_pressed.xml", "tb_all_apps_button_icon.xml",
+          "dex_back.xml", "dex_home.xml", "dex_recents.xml"):
     shutil.copy(os.path.join(HERE, f), os.path.join(ROOT, DRAW_DIR, f))
 shutil.copy(os.path.join(HERE, "clipsync_values.xml"), os.path.join(ROOT, f"{MAIN}/res/values/clipsync_values.xml"))
 print("copied sources and icons")
@@ -224,18 +225,34 @@ if "pref_screen_clipsync" not in af:
     write(AF, af)
 print("home page entry ok")
 
-# 4. U.java: make room for the button when sizing the taskbar ---------------
+# 4. U.java: make room for the divider (start) and the sync button (end) -------
 UJ = f"{TB_JAVA}/util/U.java"
 u = read(UJ)
-if "TaskbarSyncButton" not in u:
+if "DexStyle.extraStartPx" not in u:
     u = once(
         u,
-        r"(if\(getBooleanPrefWithDefault\(context, PREF_DASHBOARD\)\)\s*\n\s*baseTaskbarSize \+= context\.getResources\(\)\.getDimension\(R\.dimen\.tb_dashboard_button_size\);)",
-        r"\1\n\n        if(com.clipsync.app.TaskbarSyncButton.enabled(context))\n            baseTaskbarSize += context.getResources().getDimension(R.dimen.tb_dashboard_button_size);",
-        "taskbar size",
+        r"(if\(navbarButtonsEnabled\)\s*\n\s*baseTaskbarSize \+= context\.getResources\(\)\.getDimension\(R\.dimen\.tb_navbar_buttons_margin\);)",
+        r"\1\n\n        baseTaskbarSize += com.clipsync.app.DexStyle.extraStartPx(context);",
+        "taskbar size start",
+    )
+    u = once(
+        u,
+        r"(if\(isSystemTrayEnabled\(context\)\) \{\s*\n\s*float sysTraySize)",
+        r"if(com.clipsync.app.TaskbarSyncButton.enabled(context) && !TaskbarPosition.isVertical(context))\n            baseTaskbarSize += com.clipsync.app.TaskbarSyncButton.sizePx(context);\n\n        \1",
+        "taskbar size end",
     )
     write(UJ, u)
 print("U.java ok")
+
+# 4b. slimmer, DeX-like sizes (bar 48dp, apps button glyph 24dp) ---------------
+DM = f"{MAIN}/res/values/dimens.xml"
+dm = read(DM)
+if '<dimen name="tb_icon_size">48dp</dimen>' not in dm:
+    dm = once(dm, r'(<dimen name="tb_icon_size">)60dp(</dimen>)', r"\g<1>48dp\2", "dimen icon size")
+    dm = once(dm, r'(<dimen name="tb_base_size_start_plus_divider">)65dp(</dimen>)', r"\g<1>53dp\2", "dimen base start")
+    dm = once(dm, r'(<dimen name="tb_app_drawer_icon_padding">)4dp(</dimen>)', r"\g<1>12dp\2", "dimen drawer padding")
+    write(DM, dm)
+print("dimens ok")
 
 # 5. fixed debug signing so updates install over each other ------------------
 BG = "app/build.gradle"

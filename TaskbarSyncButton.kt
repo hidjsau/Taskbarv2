@@ -12,7 +12,7 @@ import com.farmerbb.taskbar.R
 import java.lang.ref.WeakReference
 
 /**
- * Adds a "Sync" button to the Taskbar start area, next to the Dashboard button.
+ * Adds a "Sync" button on the right side of the Taskbar, just before the status area.
  * Called from TaskbarController (patched in by patch_taskbar.py).
  * Everything here is optional: if the toggle is off, nothing is added.
  */
@@ -22,6 +22,10 @@ object TaskbarSyncButton {
     @JvmStatic
     fun enabled(ctx: Context): Boolean =
         ctx.getSharedPreferences("c", 0).getBoolean("tbbutton", true)
+
+    /** Width the button needs (px), used for the taskbar size maths. */
+    @JvmStatic
+    fun sizePx(ctx: Context): Float = 44f * ctx.resources.displayMetrics.density
 
     @JvmStatic
     fun attach(ctx: Context, anchor: View, accent: Int) {
@@ -35,7 +39,7 @@ object TaskbarSyncButton {
             val iv = ImageView(ctx)
             iv.setImageResource(R.drawable.ic_sync)
             iv.setColorFilter(accent, PorterDuff.Mode.SRC_IN)
-            val pad = (8 * ctx.resources.displayMetrics.density).toInt()
+            val pad = (10 * ctx.resources.displayMetrics.density).toInt()
             iv.setPadding(pad, pad, pad, pad)
             iv.contentDescription = "Send clipboard"
             iv.setOnClickListener {
@@ -57,20 +61,25 @@ object TaskbarSyncButton {
                 true
             }
 
-            val dp8 = pad
-            val side = (40 * ctx.resources.displayMetrics.density).toInt()
+            val d = ctx.resources.displayMetrics.density
+            val side = (40 * d).toInt()
             val icon = ctx.resources.getDimensionPixelSize(R.dimen.tb_icon_size)
             val lp: LinearLayout.LayoutParams
+            val tray = parent.findViewById<View>(R.id.add_systray_here)
+            val idx: Int
             if (parent.orientation == LinearLayout.VERTICAL) {
                 lp = LinearLayout.LayoutParams(icon, side)
-                lp.topMargin = dp8
+                lp.topMargin = (8 * d).toInt()
+                idx = parent.indexOfChild(anchor).let { if (it >= 0) it + 1 else parent.childCount }
             } else {
                 lp = LinearLayout.LayoutParams(side, icon)
-                lp.marginEnd = dp8
+                lp.marginEnd = (4 * d).toInt()
+                // right side: just before the status area
+                idx = if (tray != null && tray.parent === parent) parent.indexOfChild(tray)
+                else parent.indexOfChild(anchor).let { if (it >= 0) it + 1 else parent.childCount }
             }
             lp.gravity = Gravity.CENTER
-            val idx = parent.indexOfChild(anchor)
-            parent.addView(iv, if (idx >= 0) idx + 1 else parent.childCount, lp)
+            parent.addView(iv, idx, lp)
             ref = WeakReference(iv)
             iv.visibility = anchor.visibility.let { if (it == View.GONE) View.VISIBLE else it }
 

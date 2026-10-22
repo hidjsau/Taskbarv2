@@ -1,13 +1,19 @@
 package com.clipsync.app
 
 import android.content.Context
+import android.graphics.drawable.GradientDrawable
+import android.view.Gravity
 import android.view.View
+import android.widget.ImageView
 import android.widget.LinearLayout
 import com.farmerbb.taskbar.R
+import com.farmerbb.taskbar.util.TaskbarPosition
 import com.farmerbb.taskbar.util.U
 
 /**
- * Samsung DeX-style look for Taskbar (step 1: defaults + button order; step 2: flat dark bar).
+ * Samsung DeX-style look for Taskbar.
+ * Step 1: defaults + button order. Step 2: flat dark bar.
+ * Step 3: sleek icons, thin divider after the apps button.
  * Called from TaskbarController (patched in by patch_taskbar.py).
  */
 object DexStyle {
@@ -40,17 +46,55 @@ object DexStyle {
         }
     }
 
-    /** DeX order: Recents, Home, Back. */
+    /** Space used by our thin divider after the apps button (px). Used for centring maths. */
+    @JvmStatic
+    fun extraStartPx(ctx: Context): Float {
+        if (TaskbarPosition.isVertical(ctx)) return 0f
+        return 9f * ctx.resources.displayMetrics.density
+    }
+
+    /** DeX order (Recents, Home, Back), new icons, and the divider. */
     @JvmStatic
     fun arrangeNav(layout: View?) {
+        if (layout == null) return
         try {
-            val nav = layout?.findViewById<LinearLayout>(R.id.navbar_buttons) ?: return
-            val views = listOf(R.id.button_recents, R.id.button_home, R.id.button_back)
-                .mapNotNull { nav.findViewById<View>(it) }
-            if (views.size != 3) return
-            views.forEach { nav.removeView(it) }
-            views.forEach { nav.addView(it) }
+            val nav = layout.findViewById<LinearLayout>(R.id.navbar_buttons)
+            if (nav != null) {
+                val icons = listOf(
+                    R.id.button_recents to R.drawable.dex_recents,
+                    R.id.button_home to R.drawable.dex_home,
+                    R.id.button_back to R.drawable.dex_back
+                )
+                val views = icons.mapNotNull { nav.findViewById<ImageView>(it.first) }
+                if (views.size == 3) {
+                    icons.forEachIndexed { i, p -> views[i].setImageResource(p.second) }
+                    views.forEach { nav.removeView(it) }
+                    views.forEach { nav.addView(it) }
+                }
+            }
         } catch (e: Exception) {
         }
+        try {
+            addDivider(layout)
+        } catch (e: Exception) {
+        }
+    }
+
+    private fun addDivider(layout: View) {
+        val ctx = layout.context
+        val start = layout.findViewById<View>(R.id.start_button) ?: return
+        val parent = start.parent as? LinearLayout ?: return
+        if (parent.orientation != LinearLayout.HORIZONTAL) return
+        val d = ctx.resources.displayMetrics.density
+        val line = View(ctx)
+        val shape = GradientDrawable()
+        shape.cornerRadius = d
+        shape.setColor((U.getAccentColor(ctx) and 0x00FFFFFF) or (0x40 shl 24))
+        line.background = shape
+        val lp = LinearLayout.LayoutParams(Math.max(1, Math.round(d)), (22 * d).toInt())
+        lp.gravity = Gravity.CENTER_VERTICAL
+        lp.marginStart = (4 * d).toInt()
+        lp.marginEnd = (4 * d).toInt()
+        parent.addView(line, parent.indexOfChild(start) + 1, lp)
     }
 }
