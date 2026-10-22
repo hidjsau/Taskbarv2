@@ -50,6 +50,8 @@ object CollapseStyle {
         if (layout == null || button == null) return
         try {
             state[layout] = collapsed
+            // flat bar background only while expanded (no grey box behind the handle)
+            layout.setBackgroundColor(if (collapsed) 0 else U.getBackgroundTint(ctx))
             style(ctx, button, collapsed)
             layout.postDelayed({ place(ctx, layout) }, 80)
         } catch (e: Exception) {

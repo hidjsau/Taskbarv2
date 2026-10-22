@@ -7,17 +7,25 @@ import com.farmerbb.taskbar.R
 import com.farmerbb.taskbar.util.U
 
 /**
- * Samsung DeX-style look for Taskbar (step 1: defaults + button order).
+ * Samsung DeX-style look for Taskbar (step 1: defaults + button order; step 2: flat dark bar).
  * Called from TaskbarController (patched in by patch_taskbar.py).
  */
 object DexStyle {
     private const val DONE = "dex_defaults_v1"
+    private const val DONE2 = "dex_defaults_v2"
 
     /** Runs once: turns on nav buttons, status area and centred icons. */
     @JvmStatic
     fun applyDefaults(ctx: Context) {
         try {
             val p = U.getSharedPreferences(ctx)
+            if (!p.getBoolean(DONE2, false)) {
+                // DeX look: dark, slightly translucent bar
+                p.edit()
+                    .putInt("background_tint", 0xD9111114.toInt())
+                    .putBoolean(DONE2, true)
+                    .apply()
+            }
             if (p.getBoolean(DONE, false)) return
             p.edit()
                 .putBoolean("button_back", true)
