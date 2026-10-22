@@ -6,6 +6,8 @@ Taskbar supports Android 10's Desktop Mode, allowing you to connect your compati
 
 Taskbar is also supported on Android TV (sideloaded) and Chrome OS - use Taskbar as a secondary Android app launcher on your Chromebook, or turn your Nvidia Shield into an Android-powered PC!
 
+#### newly added text sync features.
+
 ## Features
 * Start menu - shows you all applications installed on the device, configurable as a list or as a grid
 * Recent apps tray - shows your most recently used apps and lets you easily switch between them
