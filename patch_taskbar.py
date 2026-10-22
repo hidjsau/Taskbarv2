@@ -129,6 +129,21 @@ if "TaskbarSyncButton" not in t:
         "updateButton hook",
     )
     write(TC, t)
+t = read(TC)
+if "DexStyle" not in t:
+    t = once(
+        t,
+        r"(SharedPreferences pref = U\.getSharedPreferences\(context\);\n\s*boolean altButtonConfig = pref\.getBoolean\(PREF_ALT_BUTTON_CONFIG, false\);)",
+        r"com.clipsync.app.DexStyle.applyDefaults(context);\n        \1",
+        "dex defaults",
+    )
+    t = once(
+        t,
+        r"(navbarButtonsEnabled = drawNavbarButtons\(context, layout, pref, accentColor\);)",
+        r"\1\n        com.clipsync.app.DexStyle.arrangeNav(layout);",
+        "dex nav order",
+    )
+    write(TC, t)
 print("TaskbarController ok")
 
 # 3b. entry on Taskbar's home (settings) page that opens ClipSync ------------
