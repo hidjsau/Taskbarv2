@@ -42,6 +42,53 @@ class SyncService : Service() {
     private val main = Handler(Looper.getMainLooper())
     private val recent = HashMap<String, Long>()
 
+    private class Partial(val total: Int) {
+        val parts = arrayOfNulls<String>(total)
+        var got = 0
+        val born = System.currentTimeMillis()
+    }
+
+    private val partials = HashMap<String, Partial>()
+    private val finished = HashMap<String, Long>()
+
+    private fun deliver(name: String, text: String) {
+        Net.lastClip = text
+        History.add(this, false, text, name)
+        main.post {
+            val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("sync", text))
+            Toast.makeText(this, "Synced from $name", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun chunk(id: String, name: String, rest: String) {
+        val q = rest.split(":", limit = 4)
+        if (q.size < 4) return
+        val idx = q[1].toIntOrNull() ?: return
+        val total = q[2].toIntOrNull() ?: return
+        if (total < 1 || total > 500 || idx < 0 || idx >= total) return
+        val key = "$id:${q[0]}"
+        var text: String? = null
+        val now = System.currentTimeMillis()
+        synchronized(partials) {
+            partials.entries.removeAll { now - it.value.born > 60000 }
+            finished.entries.removeAll { now - it.value > 120000 }
+            if (finished.containsKey(key)) return
+            val p = partials.getOrPut(key) { Partial(total) }
+            if (p.total != total) return
+            if (p.parts[idx] == null) {
+                p.parts[idx] = q[3]
+                p.got++
+            }
+            if (p.got == p.total) {
+                text = p.parts.joinToString("")
+                partials.remove(key)
+                finished[key] = now
+            }
+        }
+        text?.let { deliver(name, it) }
+    }
+
     // The same packet can arrive more than once (it is broadcast on several addresses).
     // Every packet has a random 12-byte IV, so identical IV = identical packet.
     private fun isDuplicate(data: ByteArray): Boolean {
@@ -168,13 +215,11 @@ class SyncService : Service() {
             }
             "T" -> if (Peers.has(this, id)) {
                 Peers.seen[id] = now
-                Net.lastClip = rest
-                History.add(this, false, rest, name)
-                main.post {
-                    val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                    cm.setPrimaryClip(ClipData.newPlainText("sync", rest))
-                    Toast.makeText(this, "Synced from $name", Toast.LENGTH_SHORT).show()
-                }
+                deliver(name, rest)
+            }
+            "C" -> if (Peers.has(this, id)) {
+                Peers.seen[id] = now
+                chunk(id, name, rest)
             }
         }
     }

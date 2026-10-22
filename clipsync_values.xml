@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="clipsync_collapse_entries">
+        <item>Same corner as the taskbar</item>
+        <item>Left corner</item>
+        <item>Right corner</item>
+        <item>Bottom centre</item>
+    </string-array>
+    <string-array name="clipsync_collapse_values">
+        <item>default</item>
+        <item>left</item>
+        <item>right</item>
+        <item>bottom_center</item>
+    </string-array>
+</resources>

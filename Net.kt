@@ -177,6 +177,34 @@ object Net {
 
     fun sendTo(pin: String, plain: String) = broadcast(Crypto.enc(pin, plain))
 
+    private const val CHUNK = 250
+
+    /** Short text goes as one packet. Long text goes as many small packets (no IP fragmentation). */
+    fun sendText(pin: String, id: String, name: String, t: String) {
+        if (t.length <= CHUNK) {
+            sendTo(pin, "T|$id|$name|$t")
+            return
+        }
+        val parts = ArrayList<String>()
+        var i = 0
+        while (i < t.length) {
+            var end = minOf(i + CHUNK, t.length)
+            // do not cut an emoji (surrogate pair) in half
+            if (end < t.length && Character.isHighSurrogate(t[end - 1])) end--
+            parts.add(t.substring(i, end))
+            i = end
+        }
+        val mid = UUID.randomUUID().toString().substring(0, 6)
+        // two rounds: lost packets in round one are filled in by round two
+        for (round in 0 until 2) {
+            for ((n, p) in parts.withIndex()) {
+                sendTo(pin, "C|$id|$name|$mid:$n:${parts.size}:$p")
+                Thread.sleep(3)
+            }
+            Thread.sleep(250)
+        }
+    }
+
     fun send(ctx: Context, text: String): Boolean {
         lastClip = text
         val peers = Peers.list(ctx)
@@ -191,7 +219,7 @@ object Net {
         val id = myId(ctx)
         val name = myName()
         thread {
-            for (p in peers) sendTo(p.pin, "T|$id|$name|$t")
+            for (p in peers) sendText(p.pin, id, name, t)
         }
         History.add(ctx, true, t, peers.joinToString(", ") { it.name })
         return true

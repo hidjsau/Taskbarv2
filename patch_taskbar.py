@@ -33,8 +33,10 @@ os.makedirs(os.path.join(ROOT, KT_DIR), exist_ok=True)
 os.makedirs(os.path.join(ROOT, DRAW_DIR), exist_ok=True)
 for f in glob.glob(os.path.join(HERE, "*.kt")):
     shutil.copy(f, os.path.join(ROOT, KT_DIR, os.path.basename(f)))
-for f in ("ic_sync.xml", "ic_clipsync_launcher.xml"):
+for f in ("ic_sync.xml", "ic_clipsync_launcher.xml", "clipsync_all_apps.xml",
+          "clipsync_all_apps_pressed.xml", "tb_all_apps_button_icon.xml"):
     shutil.copy(os.path.join(HERE, f), os.path.join(ROOT, DRAW_DIR, f))
+shutil.copy(os.path.join(HERE, "clipsync_values.xml"), os.path.join(ROOT, f"{MAIN}/res/values/clipsync_values.xml"))
 print("copied sources and icons")
 
 # 2. manifest ---------------------------------------------------------------
@@ -120,6 +122,12 @@ if "TaskbarSyncButton" not in t:
         r"\1\n            com.clipsync.app.TaskbarSyncButton.setShown(false);",
         "hide sync button",
     )
+    t = once(
+        t,
+        r"(if\(layout != null\) layout\.setAlpha\(isCollapsed && hide \? 0 : 1\);)",
+        r"\1\n        com.clipsync.app.CollapseStyle.update(context, layout, button, isCollapsed);",
+        "updateButton hook",
+    )
     write(TC, t)
 print("TaskbarController ok")
 
@@ -140,6 +148,48 @@ if "pref_screen_clipsync" not in pb:
         "tb_pref_base end",
     )
     write(BASE, pb)
+
+# 3c. Appearance settings: collapsed position + widget button switch -------------
+AP = f"{MAIN}/res/xml/tb_pref_appearance.xml"
+ap = read(AP)
+if "clipsync_collapse_pos" not in ap:
+    ap = once(
+        ap,
+        r'(\n[ \t]*<PreferenceCategory android:key="dummy")',
+        lambda x: """
+    <ListPreference
+        android:defaultValue="default"
+        android:entries="@array/clipsync_collapse_entries"
+        android:entryValues="@array/clipsync_collapse_values"
+        android:key="clipsync_collapse_pos"
+        android:negativeButtonText="@null"
+        android:positiveButtonText="@null"
+        android:title="Collapsed taskbar position" />
+
+    <CheckBoxPreference
+        android:defaultValue="@bool/tb_def_dashboard"
+        android:key="dashboard"
+        android:summary="Show a button in the Taskbar that opens your widgets"
+        android:title="Widget button" />
+""" + x.group(1),
+        "appearance prefs",
+    )
+    write(AP, ap)
+
+AFR = f"{TB_JAVA}/fragment/AppearanceFragment.java"
+afr = read(AFR)
+if "clipsync_collapse_pos" not in afr:
+    afr = once(
+        afr,
+        r"(bindPreferenceSummaryToValue\(findPreference\(PREF_THEME\)\);)",
+        r'''if(pref.getString("clipsync_collapse_pos", null) == null)
+            pref.edit().putString("clipsync_collapse_pos", "default").apply();
+        bindPreferenceSummaryToValue(findPreference("clipsync_collapse_pos"));
+        bindPreferenceSummaryToValue(findPreference(PREF_DASHBOARD));
+        \1''',
+        "appearance bind",
+    )
+    write(AFR, afr)
 
 AF = f"{TB_JAVA}/fragment/AboutFragment.java"
 af = read(AF)
