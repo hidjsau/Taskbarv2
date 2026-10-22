@@ -54,6 +54,7 @@ if "com.clipsync.app" not in m:
             android:exported="true"
             android:icon="@drawable/ic_clipsync_launcher"
             android:label="ClipSync"
+            android:taskAffinity="com.clipsync.app.task"
             android:theme="@android:style/Theme.DeviceDefault.Light">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -67,6 +68,7 @@ if "com.clipsync.app" not in m:
             android:name="com.clipsync.app.HistoryActivity"
             android:exported="false"
             android:label="ClipSync messages"
+            android:taskAffinity="com.clipsync.app.task"
             android:theme="@android:style/Theme.DeviceDefault.Light" />
         <activity
             android:name="com.clipsync.app.SendActivity"
@@ -120,6 +122,42 @@ if "TaskbarSyncButton" not in t:
     )
     write(TC, t)
 print("TaskbarController ok")
+
+# 3b. entry on Taskbar's home (settings) page that opens ClipSync ------------
+BASE = f"{MAIN}/res/xml/tb_pref_base.xml"
+pb = read(BASE)
+if "pref_screen_clipsync" not in pb:
+    pb = once(
+        pb,
+        r"(\n[ \t]*</PreferenceScreen>)",
+        lambda x: """
+    <Preference
+        android:key="pref_screen_clipsync"
+        android:icon="@drawable/ic_clipsync_launcher"
+        android:title="Text Sync (ClipSync)"
+        android:summary="Send clipboard text to your other devices" />
+""" + x.group(1),
+        "tb_pref_base end",
+    )
+    write(BASE, pb)
+
+AF = f"{TB_JAVA}/fragment/AboutFragment.java"
+af = read(AF)
+if "pref_screen_clipsync" not in af:
+    af = once(
+        af,
+        r"(findPreference\(PREF_PREF_SCREEN_ADVANCED\)\.setOnPreferenceClickListener\(this\);)",
+        r'\1\n        findPreference("pref_screen_clipsync").setOnPreferenceClickListener(this);',
+        "about listener",
+    )
+    af = once(
+        af,
+        r"(switch\(p\.getKey\(\)\) \{\s*\n)(\s*)(case PREF_ABOUT:)",
+        r'\1\2case "pref_screen_clipsync":\n\2    startActivity(new Intent(getActivity(), com.clipsync.app.MainActivity.class)\n\2            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));\n\2    break;\n\2\3',
+        "about click",
+    )
+    write(AF, af)
+print("home page entry ok")
 
 # 4. U.java: make room for the button when sizing the taskbar ---------------
 UJ = f"{TB_JAVA}/util/U.java"

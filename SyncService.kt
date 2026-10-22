@@ -40,6 +40,21 @@ class SyncService : Service() {
     private var lock: WifiManager.MulticastLock? = null
     private var bubble: TextView? = null
     private val main = Handler(Looper.getMainLooper())
+    private val recent = HashMap<String, Long>()
+
+    // The same packet can arrive more than once (it is broadcast on several addresses).
+    // Every packet has a random 12-byte IV, so identical IV = identical packet.
+    private fun isDuplicate(data: ByteArray): Boolean {
+        if (data.size < 12) return false
+        val key = data.copyOfRange(0, 12).joinToString("") { "%02x".format(it) }
+        val now = System.currentTimeMillis()
+        synchronized(recent) {
+            recent.entries.removeAll { now - it.value > 30000 }
+            if (recent.containsKey(key)) return true
+            recent[key] = now
+        }
+        return false
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -130,6 +145,7 @@ class SyncService : Service() {
     private fun handle(data: ByteArray) {
         val pin = Net.myPin(this)
         val plain = Crypto.dec(pin, data) ?: return
+        if (isDuplicate(data)) return
         val f = plain.split("|", limit = 4)
         if (f.size < 4) return
         val id = f[1]

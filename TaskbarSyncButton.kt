@@ -47,6 +47,16 @@ object TaskbarSyncButton {
                 }
             }
 
+            iv.setOnLongClickListener {
+                try {
+                    ctx.startActivity(
+                        Intent(ctx, HistoryActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    )
+                } catch (e: Exception) {
+                }
+                true
+            }
+
             val dp8 = pad
             val side = (40 * ctx.resources.displayMetrics.density).toInt()
             val icon = ctx.resources.getDimensionPixelSize(R.dimen.tb_icon_size)
