@@ -25,7 +25,9 @@ import android.view.WindowManager
 import android.widget.TextView
 import android.widget.Toast
 import java.net.DatagramPacket
+import java.io.DataInputStream
 import java.net.DatagramSocket
+import java.net.ServerSocket
 import java.net.InetSocketAddress
 import kotlin.concurrent.thread
 
@@ -37,6 +39,7 @@ class SyncService : Service() {
 
     private var running = false
     private var sock: DatagramSocket? = null
+    private var server: ServerSocket? = null
     private var lock: WifiManager.MulticastLock? = null
     private var bubble: TextView? = null
     private val main = Handler(Looper.getMainLooper())
@@ -74,8 +77,21 @@ class SyncService : Service() {
             partials.entries.removeAll { now - it.value.born > 60000 }
             finished.entries.removeAll { now - it.value > 120000 }
             if (finished.containsKey(key)) return
+            val fresh = !partials.containsKey(key)
             val p = partials.getOrPut(key) { Partial(total) }
             if (p.total != total) return
+            if (fresh) {
+                main.postDelayed({
+                    synchronized(partials) {
+                        partials[key]?.let {
+                            Toast.makeText(
+                                this, "Incomplete message: got ${it.got} of ${it.total} pieces",
+                                Toast.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }, 10000)
+            }
             if (p.parts[idx] == null) {
                 p.parts[idx] = q[3]
                 p.got++
@@ -150,6 +166,7 @@ class SyncService : Service() {
             lock?.setReferenceCounted(false)
             lock?.acquire()
             listen()
+            listenTcp()
             heartbeat()
         }
         if (getSharedPreferences("c", 0).getBoolean("bubble", false)) showBubble() else hideBubble()
@@ -182,14 +199,47 @@ class SyncService : Service() {
                 while (running) {
                     val p = DatagramPacket(buf, buf.size)
                     s.receive(p)
-                    handle(p.data.copyOf(p.length))
+                    handle(p.data.copyOf(p.length), p.address?.hostAddress)
                 }
             } catch (e: Exception) {
             }
         }
     }
 
-    private fun handle(data: ByteArray) {
+    private fun listenTcp() {
+        thread {
+            try {
+                val ss = ServerSocket()
+                ss.reuseAddress = true
+                ss.bind(InetSocketAddress(Net.TCP_PORT))
+                server = ss
+                while (running) {
+                    val c = ss.accept()
+                    thread {
+                        try {
+                            c.soTimeout = 8000
+                            val i = DataInputStream(c.getInputStream())
+                            val n = i.readInt()
+                            if (n in 13..300000) {
+                                val b = ByteArray(n)
+                                i.readFully(b)
+                                handle(b, c.inetAddress?.hostAddress)
+                            }
+                        } catch (e: Exception) {
+                        } finally {
+                            try {
+                                c.close()
+                            } catch (e: Exception) {
+                            }
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+            }
+        }
+    }
+
+    private fun handle(data: ByteArray, from: String?) {
         val pin = Net.myPin(this)
         val plain = Crypto.dec(pin, data) ?: return
         if (isDuplicate(data)) return
@@ -200,6 +250,7 @@ class SyncService : Service() {
         val name = f[2]
         val rest = f[3]
         val now = System.currentTimeMillis()
+        if (from != null) Peers.ip[id] = from
         when (f[0]) {
             "P" -> if (rest.length == 4) {
                 Peers.add(this, Peer(id, name, rest))
@@ -297,6 +348,7 @@ class SyncService : Service() {
         running = false
         on = false
         sock?.close()
+        server?.close()
         lock?.release()
         hideBubble()
         super.onDestroy()

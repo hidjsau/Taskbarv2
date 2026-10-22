@@ -8,10 +8,13 @@ import android.os.Build
 import android.widget.TextView
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.DataOutputStream
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.NetworkInterface
+import java.net.Socket
 import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -43,6 +46,7 @@ class Msg(val sent: Boolean, val text: String, val who: String, val time: Long)
 
 object Peers {
     val seen = ConcurrentHashMap<String, Long>()
+    val ip = ConcurrentHashMap<String, String>()
 
     private fun clean(s: String) = s.replace(Regex("[\t\n|]"), " ")
 
@@ -70,6 +74,7 @@ object Peers {
     fun remove(ctx: Context, id: String) {
         save(ctx, list(ctx).filter { it.id != id })
         seen.remove(id)
+        ip.remove(id)
     }
 
     fun has(ctx: Context, id: String): Boolean = list(ctx).any { it.id == id }
@@ -117,6 +122,7 @@ object History {
 
 object Net {
     const val PORT = 48555
+    const val TCP_PORT = 48556
     @Volatile
     var lastClip = ""
     private var lastText = ""
@@ -180,7 +186,26 @@ object Net {
     private const val CHUNK = 250
 
     /** Short text goes as one packet. Long text goes as many small packets (no IP fragmentation). */
-    fun sendText(pin: String, id: String, name: String, t: String) {
+    private fun sendTcp(addr: String, data: ByteArray): Boolean = try {
+        Socket().use { s ->
+            s.connect(InetSocketAddress(addr, TCP_PORT), 3000)
+            s.soTimeout = 8000
+            val o = DataOutputStream(s.getOutputStream())
+            o.writeInt(data.size)
+            o.write(data)
+            o.flush()
+        }
+        true
+    } catch (e: Exception) {
+        false
+    }
+
+    fun sendText(peer: Peer, id: String, name: String, t: String) {
+        val pin = peer.pin
+        // 1) direct connection to the other device: reliable, no size problem
+        val addr = Peers.ip[peer.id]
+        if (addr != null && sendTcp(addr, Crypto.enc(pin, "T|$id|$name|$t"))) return
+        // 2) fallback: broadcast (long text split into small pieces)
         if (t.length <= CHUNK) {
             sendTo(pin, "T|$id|$name|$t")
             return
@@ -219,7 +244,7 @@ object Net {
         val id = myId(ctx)
         val name = myName()
         thread {
-            for (p in peers) sendText(p.pin, id, name, t)
+            for (p in peers) sendText(p, id, name, t)
         }
         History.add(ctx, true, t, peers.joinToString(", ") { it.name })
         return true

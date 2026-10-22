@@ -148,6 +148,7 @@ class MainActivity : Activity() {
             h.postDelayed({ refresh() }, 700)
         }
         root.addView(svcBtn)
+        root.addView(tv("Build v7 (direct connection + pieces)", 11f, false, Color.GRAY))
 
         setContentView(scroll)
     }
