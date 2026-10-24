@@ -42,11 +42,20 @@ move tb_start_menu_vertical_right.xml app/src/main/res/layout
 move StartMenuController.java app/src/main/java/com/farmerbb/taskbar/ui
 move StartMenuAdapter.java    app/src/main/java/com/farmerbb/taskbar/adapter
 
+# Keep-alive watchdog (accessibility service)
+move PowerMenuService.java    app/src/main/java/com/farmerbb/taskbar/service
+
 # "Close app" fallback needs this permission (idempotent)
 MF=app/src/playstore/AndroidManifest.xml
 if [ -f "$MF" ] && ! grep -q KILL_BACKGROUND_PROCESSES "$MF"; then
   sed -i '0,/<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/s//<uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" \/>\n    &/' "$MF"
   echo "added KILL_BACKGROUND_PROCESSES"
+fi
+
+# Battery-optimisation exemption prompt (idempotent)
+if [ -f "$MF" ] && ! grep -q REQUEST_IGNORE_BATTERY_OPTIMIZATIONS "$MF"; then
+  sed -i '0,/<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/s//<uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" \/>\n    &/' "$MF"
+  echo "added REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"
 fi
 
 echo "restructure done"
