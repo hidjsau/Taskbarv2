@@ -334,7 +334,7 @@ public class TaskbarController extends UIController {
             drawSysTray(context, layoutId, layout);
         }
 
-        layout.setBackgroundColor(backgroundTint);
+        U.applyGlassBackground(context, layout, backgroundTint);
         layout.findViewById(R.id.divider).setBackgroundColor(
                 pref.getBoolean(PREF_CENTERED_ICONS, false) ? 0 : accentColor
         );

@@ -18,6 +18,7 @@ move strings.xml         app/src/main/res/values
 move tb_pref_general.xml app/src/main/res/xml
 move U.java              app/src/main/java/com/farmerbb/taskbar/util
 move TaskbarController.java app/src/main/java/com/farmerbb/taskbar/ui
+move UIHostService.java      app/src/main/java/com/farmerbb/taskbar/ui
 move Constants.java         app/src/main/java/com/farmerbb/taskbar/util
 move ContextMenuActivity.java app/src/main/java/com/farmerbb/taskbar/activity
 move tb_pref_context_menu_launch_options.xml app/src/main/res/xml

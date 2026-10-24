@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.PixelFormat
 import android.graphics.RectF
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -58,7 +59,12 @@ object CollapseStyle {
         try {
             state[layout] = collapsed
             // flat bar background only while expanded (no grey box behind the handle)
-            layout.setBackgroundColor(if (collapsed) 0 else U.getBackgroundTint(ctx))
+            if (collapsed) {
+                layout.setBackgroundColor(0)
+                layout.tag = null
+            } else {
+                U.applyGlassBackground(ctx, layout, U.getBackgroundTint(ctx))
+            }
             // the thin divider next to the start button must not show (or take space) when collapsed
             layout.findViewWithTag<View>(DexStyle.DIVIDER_TAG)?.visibility =
                 if (collapsed) View.GONE else View.VISIBLE
@@ -188,8 +194,30 @@ object CollapseStyle {
             RIGHT -> vert or Gravity.RIGHT
             else -> vert or Gravity.LEFT
         }
+        var changed = false
+
+        // keep the glass blur in sync: on while the bar is expanded, off while collapsed
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val want = U.GLASS_TAG == layout.tag && U.isGlassBlurAvailable(ctx)
+            val has = (lp.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND) != 0
+            if (want != has) {
+                if (want) {
+                    lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+                    lp.blurBehindRadius = Math.round(ctx.resources.displayMetrics.density * 24)
+                } else {
+                    lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
+                    lp.blurBehindRadius = 0
+                }
+                changed = true
+            }
+        }
+
         if (lp.gravity != g) {
             lp.gravity = g
+            changed = true
+        }
+
+        if (changed) {
             try {
                 (ctx.getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(layout, lp)
             } catch (e: Exception) {
