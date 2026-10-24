@@ -6,6 +6,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Restructure uploaded files
+        run: bash restructure.sh
       - name: Add ClipSync to Taskbar
         run: python3 patch_taskbar.py
       - uses: actions/setup-java@v4
