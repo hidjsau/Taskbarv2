@@ -921,23 +921,10 @@ public class U {
         return pref.getInt(PREF_BACKGROUND_TINT, context.getResources().getInteger(R.integer.tb_translucent_gray));
     }
 
-    public static final String GLASS_TAG = "tb_glass";
-
-    public static boolean isGlassBlurAvailable(Context context) {
-        if(Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return false;
-
-        try {
-            WindowManager wm = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
-            return wm.isCrossWindowBlurEnabled();
-        } catch (Exception e) {
-            return false;
-        }
-    }
-
     /**
-     * Frosted-glass look: a soft light-to-dark translucent gradient, a thin bright edge and (on
-     * Android 12+, see UIHostService) a blur of everything behind the bar. A fully transparent
-     * background tint is respected and left alone.
+     * Glass-style bar background: a soft translucent light-to-dark gradient with no outline.
+     * (No window blur: blurring behind an overlay window affected the whole screen.)
+     * A fully transparent background tint is respected and left alone.
      */
     public static void applyGlassBackground(Context context, View view, int tint) {
         if(Color.alpha(tint) == 0) {
@@ -945,15 +932,12 @@ public class U {
             return;
         }
 
-        boolean blur = isGlassBlurAvailable(context);
         int base = androidx.core.graphics.ColorUtils.blendARGB(tint | 0xFF000000, Color.WHITE, 0.12f);
+        int inner = androidx.core.graphics.ColorUtils.setAlphaComponent(
+                androidx.core.graphics.ColorUtils.blendARGB(base, Color.WHITE, 0.10f), 0xB4);
+        int outer = androidx.core.graphics.ColorUtils.setAlphaComponent(base, 0x96);
 
-        int innerAlpha = blur ? 0x6E : 0xC4;
-        int outerAlpha = blur ? 0x52 : 0xAA;
-        int inner = androidx.core.graphics.ColorUtils.setAlphaComponent(androidx.core.graphics.ColorUtils.blendARGB(base, Color.WHITE, 0.10f), innerAlpha);
-        int outer = androidx.core.graphics.ColorUtils.setAlphaComponent(base, outerAlpha);
-
-        // The lighter side of the gradient faces into the screen, like light catching the glass
+        // The lighter side of the gradient faces into the screen
         android.graphics.drawable.GradientDrawable.Orientation orientation;
         if(TaskbarPosition.isVerticalLeft(context))
             orientation = android.graphics.drawable.GradientDrawable.Orientation.RIGHT_LEFT;
@@ -964,14 +948,7 @@ public class U {
         else
             orientation = android.graphics.drawable.GradientDrawable.Orientation.BOTTOM_TOP;
 
-        android.graphics.drawable.GradientDrawable glass = new android.graphics.drawable.GradientDrawable(orientation, new int[] {inner, outer});
-        glass.setStroke(
-                Math.max(1, Math.round(context.getResources().getDisplayMetrics().density)),
-                androidx.core.graphics.ColorUtils.setAlphaComponent(Color.WHITE, 0x38)
-        );
-
-        view.setBackground(glass);
-        view.setTag(GLASS_TAG);
+        view.setBackground(new android.graphics.drawable.GradientDrawable(orientation, new int[] {inner, outer}));
     }
 
     public static int getAccentColor(Context context) {

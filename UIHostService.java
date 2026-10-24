@@ -18,7 +18,6 @@ package com.farmerbb.taskbar.ui;
 import android.app.Service;
 import android.content.Intent;
 import android.content.res.Configuration;
-import android.os.Build;
 import android.os.IBinder;
 import android.view.View;
 import android.view.WindowManager;
@@ -69,7 +68,7 @@ public abstract class UIHostService extends Service implements UIHost {
 
     @Override
     public void addView(View view, ViewParams params) {
-        windowManager.addView(view, buildWindowParams(view, params));
+        windowManager.addView(view, params.toWindowManagerParams());
     }
 
     @Override
@@ -84,21 +83,7 @@ public abstract class UIHostService extends Service implements UIHost {
 
     @Override
     public void updateViewLayout(View view, ViewParams params) {
-        windowManager.updateViewLayout(view, buildWindowParams(view, params));
-    }
-
-    // Frosted-glass taskbar: blur whatever is behind the window (Android 12+ when the device allows it)
-    private WindowManager.LayoutParams buildWindowParams(View view, ViewParams params) {
-        WindowManager.LayoutParams wmParams = params.toWindowManagerParams();
-
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                && U.GLASS_TAG.equals(view.getTag())
-                && U.isGlassBlurAvailable(this)) {
-            wmParams.flags |= WindowManager.LayoutParams.FLAG_BLUR_BEHIND;
-            wmParams.setBlurBehindRadius(Math.round(getResources().getDisplayMetrics().density * 24));
-        }
-
-        return wmParams;
+        windowManager.updateViewLayout(view, params.toWindowManagerParams());
     }
 
     public abstract UIController newController();
