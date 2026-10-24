@@ -24,6 +24,7 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Color;
 import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageManager;
@@ -41,6 +42,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 
 import androidx.annotation.VisibleForTesting;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import androidx.appcompat.widget.SearchView;
 import android.util.Patterns;
@@ -238,11 +240,31 @@ public class StartMenuController extends UIController {
         // A custom background tint chosen by the user still wins, drawn with the same shapes.
         if(pref.getBoolean(PREF_TRANSPARENT_START_MENU, false)) {
             startMenuFrame.setBackground(null);
-        } else if(pref.contains(PREF_BACKGROUND_TINT)) {
-            int backgroundTint = U.getBackgroundTint(context);
-            startMenuFrame.setBackground(createSurfaceDrawable(backgroundTint, R.dimen.tb_drawer_card_radius, true));
-            layout.findViewById(R.id.search_view_child_layout)
-                    .setBackground(createSearchDrawable(backgroundTint));
+        } else {
+            // Opacity is user-controlled (Settings > Appearance > App drawer opacity).
+            // 100% keeps the stock solid drawable; anything lower is drawn in code.
+            int opacity = getDrawerOpacity(pref);
+            boolean hasTint = pref.contains(PREF_BACKGROUND_TINT);
+
+            if(hasTint || opacity < 100) {
+                boolean dark = StartMenuAdapter.isDarkSurface(context);
+                int cardBase = hasTint
+                        ? U.getBackgroundTint(context)
+                        : ContextCompat.getColor(context, dark
+                                ? R.color.tb_drawer_container_dark : R.color.tb_drawer_container_light);
+                int searchBase = hasTint
+                        ? cardBase
+                        : ContextCompat.getColor(context, dark
+                                ? R.color.tb_drawer_search_dark : R.color.tb_drawer_search_light);
+
+                startMenuFrame.setBackground(createSurfaceDrawable(
+                        withOpacity(cardBase, opacity), R.dimen.tb_drawer_card_radius, true));
+                layout.findViewById(R.id.search_view_child_layout)
+                        .setBackground(createSearchDrawable(withOpacity(searchBase, opacity)));
+
+                // A shadow under a see-through card looks muddy
+                if(opacity < 100) startMenuFrame.setElevation(0);
+            }
         }
 
         applyDrawerColors(shouldShowSearchBox);
@@ -616,6 +638,20 @@ public class StartMenuController extends UIController {
             entries.add(newEntry);
         }
         return entries;
+    }
+
+    /** Drawer background opacity in percent (20..100), default 90. */
+    private static int getDrawerOpacity(SharedPreferences pref) {
+        try {
+            return Math.max(10, Math.min(100, Integer.parseInt(pref.getString("drawer_opacity", "90"))));
+        } catch(NumberFormatException e) {
+            return 90;
+        }
+    }
+
+    /** Scales a color's own alpha by the opacity percentage. */
+    private static int withOpacity(int color, int percent) {
+        return ColorUtils.setAlphaComponent(color, Math.round(Color.alpha(color) * percent / 100f));
     }
 
     private void applyDrawerColors(boolean hasSearch) {
