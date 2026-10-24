@@ -302,6 +302,45 @@ if "clipsync_bar_theme" not in afr:
     write(AFR, afr)
 print("theme picker ok")
 
+# 3f. Reserve screen space (Appearance settings, experimental) -----------------
+ap = read(AP)
+if "clipsync_reserve_space" not in ap:
+    ap = once(
+        ap,
+        r'(\n[ \t]*<Preference\s+android:key="clipsync_bar_theme")',
+        lambda x: """
+    <Preference
+        android:key="clipsync_reserve_space"
+        android:title="Reserve screen space"
+        android:summary="Apps open above the taskbar (experimental)" />
+""" + x.group(1),
+        "reserve pref",
+    )
+    write(AP, ap)
+
+afr = read(AFR)
+if "clipsync_reserve_space" not in afr:
+    afr = once(
+        afr,
+        r'(findPreference\("clipsync_bar_theme"\)\.setOnPreferenceClickListener\(this\);)',
+        r'''findPreference("clipsync_reserve_space").setOnPreferenceClickListener(this);
+        findPreference("clipsync_reserve_space").setSummary(com.clipsync.app.BarSpace.summary(getActivity()));
+        \1''',
+        "reserve listener",
+    )
+    afr = once(
+        afr,
+        r'(            case "clipsync_bar_theme":\n)',
+        r'''            case "clipsync_reserve_space":
+                com.clipsync.app.BarSpace.showDialog(getActivity(),
+                        () -> p.setSummary(com.clipsync.app.BarSpace.summary(getActivity())));
+                break;
+\1''',
+        "reserve click",
+    )
+    write(AFR, afr)
+print("reserve space ok")
+
 print("home page entry ok")
 
 # 4. U.java: make room for the divider (start) and the sync button (end) -------
