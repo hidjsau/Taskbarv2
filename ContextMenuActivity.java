@@ -576,7 +576,7 @@ public class ContextMenuActivity extends PreferenceActivity implements Preferenc
                         launchInNewWindow = true;
                         break;
                     default:
-                        launchSize = "fullscreen";
+                        launchSize = "true_fullscreen";
                         break;
                 }
 

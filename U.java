@@ -1051,6 +1051,9 @@ public class U {
                 return launchMode1(context, type, view, 8);
             case "fullscreen":
                 return launchMode2(context, MAXIMIZED, type, view);
+            case "true_fullscreen":
+                // Real fullscreen task (not a screen-sized freeform window)
+                return getActivityOptions(context, ApplicationType.APP_FULLSCREEN, view).toBundle();
             case "split_top":
                 return launchMode2(context, TOP_HALF, type, view);
             case "split_bottom":

@@ -1606,7 +1606,7 @@ public class TaskbarController extends UIController {
                 return;
             }
 
-            U.launchApp(context, entry, "fullscreen", true, false, view);
+            U.launchApp(context, entry, "true_fullscreen", true, false, view);
         });
 
         layout.setOnLongClickListener(view -> {
