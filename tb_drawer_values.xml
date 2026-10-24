@@ -35,4 +35,5 @@
 
     <dimen name="tb_drawer_edge_gap">12dp</dimen>
     <dimen name="tb_drawer_search_height">52dp</dimen>
+    <dimen name="tb_drawer_elevation">6dp</dimen>
 </resources>

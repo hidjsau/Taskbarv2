@@ -23,6 +23,8 @@
     android:orientation="horizontal"
     android:padding="@dimen/tb_drawer_edge_gap"
     android:clickable="true"
+    android:clipChildren="false"
+    android:clipToPadding="false"
     android:visibility="gone">
 
     <LinearLayout
@@ -36,7 +38,8 @@
             android:layout_height="wrap_content"
             android:padding="@dimen/tb_drawer_card_padding"
             android:background="@drawable/tb_drawer_card_bg"
-            android:clipToOutline="true">
+            android:clipToOutline="true"
+        android:elevation="@dimen/tb_drawer_elevation">
 
             <GridView
                 android:id="@+id/start_menu"
@@ -70,6 +73,7 @@
                 android:layout_height="wrap_content"
                 android:minHeight="@dimen/tb_drawer_search_height"
                 android:background="@drawable/tb_drawer_search_bg"
+            android:addStatesFromChildren="true"
                 android:paddingLeft="8dp"
                 android:paddingRight="4dp"
                 android:gravity="center_vertical">

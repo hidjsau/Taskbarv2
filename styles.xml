@@ -145,4 +145,25 @@
         <item name="android:windowMinWidthMinor">95%</item>
     </style>
 
+    <!-- Drawer token sets: applied on top of the Taskbar theme so the drawer follows its real surface -->
+    <style name="TaskbarDrawerSurfaceLight">
+        <item name="tb_drawer_container">@color/tb_drawer_container_light</item>
+        <item name="tb_drawer_search">@color/tb_drawer_search_light</item>
+        <item name="tb_drawer_outline">@color/tb_drawer_outline_light</item>
+        <item name="tb_drawer_on_surface">@color/tb_drawer_on_surface_light</item>
+        <item name="tb_drawer_on_surface_variant">@color/tb_drawer_on_surface_variant_light</item>
+        <item name="tb_drawer_state_layer">@color/tb_drawer_state_layer_light</item>
+        <item name="tb_drawer_hover">@color/tb_drawer_hover_light</item>
+    </style>
+
+    <style name="TaskbarDrawerSurfaceDark">
+        <item name="tb_drawer_container">@color/tb_drawer_container_dark</item>
+        <item name="tb_drawer_search">@color/tb_drawer_search_dark</item>
+        <item name="tb_drawer_outline">@color/tb_drawer_outline_dark</item>
+        <item name="tb_drawer_on_surface">@color/tb_drawer_on_surface_dark</item>
+        <item name="tb_drawer_on_surface_variant">@color/tb_drawer_on_surface_variant_dark</item>
+        <item name="tb_drawer_state_layer">@color/tb_drawer_state_layer_dark</item>
+        <item name="tb_drawer_hover">@color/tb_drawer_hover_dark</item>
+    </style>
+
 </resources>

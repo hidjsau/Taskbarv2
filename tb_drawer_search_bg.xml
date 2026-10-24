@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="?tb_drawer_search" />
-    <corners android:radius="@dimen/tb_drawer_search_radius" />
-</shape>
+<!-- Search pill. The 2dp edge shows while the field (or any child of the pill) has focus. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="?tb_drawer_search" />
+            <corners android:radius="@dimen/tb_drawer_search_radius" />
+            <stroke android:width="2dp" android:color="?tb_drawer_on_surface_variant" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="?tb_drawer_search" />
+            <corners android:radius="@dimen/tb_drawer_search_radius" />
+        </shape>
+    </item>
+</selector>

@@ -28,6 +28,7 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.ColorUtils;
 import android.util.SparseIntArray;
+import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
@@ -82,12 +83,28 @@ public class StartMenuAdapter extends ArrayAdapter<AppEntry> implements SectionI
         return U.isDarkTheme(context);
     }
 
+    // Text colors come from the same drawer tokens as everything else (tb_drawer_values.xml)
     public static int getOnSurfaceColor(Context context) {
-        return isDarkSurface(context) ? 0xFFD9DBE0 : 0xFF33363B;
+        return ContextCompat.getColor(context, isDarkSurface(context)
+                ? R.color.tb_drawer_on_surface_dark
+                : R.color.tb_drawer_on_surface_light);
     }
 
     public static int getOnSurfaceVariantColor(Context context) {
-        return isDarkSurface(context) ? 0xFFAEB2BA : 0xFF5C6068;
+        return ContextCompat.getColor(context, isDarkSurface(context)
+                ? R.color.tb_drawer_on_surface_variant_dark
+                : R.color.tb_drawer_on_surface_variant_light);
+    }
+
+    /**
+     * Taskbar theme plus the drawer token set that matches the real surface. Ripple, hover and
+     * focus colors in the drawer drawables read these tokens, so they stay visible when a dark
+     * tint is used with the light theme (or the other way around).
+     */
+    public static Context getSurfaceContext(Context context) {
+        return new ContextThemeWrapper(U.wrapContext(context), isDarkSurface(context)
+                ? R.style.TaskbarDrawerSurfaceDark
+                : R.style.TaskbarDrawerSurfaceLight);
     }
 
     // Drawer item layouts read theme attributes, so they must be inflated with the Taskbar theme
@@ -95,7 +112,7 @@ public class StartMenuAdapter extends ArrayAdapter<AppEntry> implements SectionI
 
     public StartMenuAdapter(Context context, int layout, List<AppEntry> list) {
         super(context, layout, list);
-        themedContext = U.wrapContext(context);
+        themedContext = getSurfaceContext(context);
         isGrid = layout == R.layout.tb_row_alt;
 
         updateList(list, true);
@@ -149,6 +166,28 @@ public class StartMenuAdapter extends ArrayAdapter<AppEntry> implements SectionI
         }
 
         layout.setBackground(itemBg);
+
+        // Small press response on the icon, same idea as the taskbar icons
+        imageView.animate().cancel();
+        imageView.setScaleX(1f);
+        imageView.setScaleY(1f);
+
+        if(visualFeedbackEnabled) {
+            layout.setOnTouchListener((v, event) -> {
+                switch(event.getActionMasked()) {
+                    case MotionEvent.ACTION_DOWN:
+                        imageView.animate().scaleX(0.92f).scaleY(0.92f).setDuration(90).start();
+                        break;
+                    case MotionEvent.ACTION_UP:
+                    case MotionEvent.ACTION_CANCEL:
+                        imageView.animate().scaleX(1f).scaleY(1f).setDuration(140).start();
+                        break;
+                }
+
+                return false;
+            });
+        } else
+            layout.setOnTouchListener(null);
 
         layout.setOnGenericMotionListener((view, motionEvent) -> {
             int action = motionEvent.getAction();

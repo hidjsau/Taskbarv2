@@ -11,6 +11,21 @@
     <item>
         <inset android:inset="@dimen/tb_drawer_item_inset">
             <selector>
+                <!-- keyboard focus / arrow-key selection: state layer plus a 2dp ring -->
+                <item android:state_focused="true">
+                    <shape android:shape="rectangle">
+                        <solid android:color="?tb_drawer_hover" />
+                        <stroke android:width="2dp" android:color="?tb_drawer_on_surface_variant" />
+                        <corners android:radius="@dimen/tb_drawer_item_radius" />
+                    </shape>
+                </item>
+                <item android:state_selected="true">
+                    <shape android:shape="rectangle">
+                        <solid android:color="?tb_drawer_hover" />
+                        <stroke android:width="2dp" android:color="?tb_drawer_on_surface_variant" />
+                        <corners android:radius="@dimen/tb_drawer_item_radius" />
+                    </shape>
+                </item>
                 <item android:state_hovered="true">
                     <shape android:shape="rectangle">
                         <solid android:color="?tb_drawer_hover" />

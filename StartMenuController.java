@@ -31,6 +31,8 @@ import android.content.res.Configuration;
 import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.LayerDrawable;
+import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -39,6 +41,7 @@ import android.os.UserHandle;
 import android.os.UserManager;
 
 import androidx.annotation.VisibleForTesting;
+import androidx.core.graphics.ColorUtils;
 import androidx.appcompat.widget.SearchView;
 import android.util.Patterns;
 import android.view.Gravity;
@@ -47,6 +50,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.view.animation.PathInterpolator;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputMethodManager;
 import android.webkit.URLUtil;
@@ -98,6 +102,9 @@ public class StartMenuController extends UIController {
     private boolean searchViewClicked = false;
 
     private List<String> currentStartMenuIds = new ArrayList<>();
+
+    private static final long DRAWER_ENTER_MS = 220;
+    private static final long DRAWER_EXIT_MS = 150;
 
     private final View.OnClickListener ocl = view -> toggleStartMenu();
 
@@ -196,7 +203,7 @@ public class StartMenuController extends UIController {
         params.gravity = getStartMenuGravity(taskbarPosition);
 
         // Initialize views
-        layout = (StartMenuLayout) LayoutInflater.from(U.wrapContext(context)).inflate(layoutId, null);
+        layout = (StartMenuLayout) LayoutInflater.from(StartMenuAdapter.getSurfaceContext(context)).inflate(layoutId, null);
         layout.setAlpha(0);
 
         startMenu = layout.findViewById(R.id.start_menu);
@@ -233,9 +240,9 @@ public class StartMenuController extends UIController {
             startMenuFrame.setBackground(null);
         } else if(pref.contains(PREF_BACKGROUND_TINT)) {
             int backgroundTint = U.getBackgroundTint(context);
-            startMenuFrame.setBackground(createRoundedDrawable(backgroundTint, R.dimen.tb_drawer_card_radius));
+            startMenuFrame.setBackground(createSurfaceDrawable(backgroundTint, R.dimen.tb_drawer_card_radius, true));
             layout.findViewById(R.id.search_view_child_layout)
-                    .setBackground(createRoundedDrawable(backgroundTint, R.dimen.tb_drawer_search_radius));
+                    .setBackground(createSearchDrawable(backgroundTint));
         }
 
         applyDrawerColors(shouldShowSearchBox);
@@ -638,11 +645,124 @@ public class StartMenuController extends UIController {
         if(closeIcon != null) closeIcon.setColorFilter(variant, PorterDuff.Mode.SRC_IN);
     }
 
-    private GradientDrawable createRoundedDrawable(int color, int radiusRes) {
-        GradientDrawable drawable = new GradientDrawable();
-        drawable.setColor(color);
-        drawable.setCornerRadius(context.getResources().getDimension(radiusRes));
-        return drawable;
+    /**
+     * Drawer card surface for a custom background tint: same rounded shape as the default card,
+     * with a hairline edge (so it never looks different from the default card) and, on dark
+     * surfaces, a faint top sheen. Edge and sheen follow the real surface, not the app theme.
+     */
+    private Drawable createSurfaceDrawable(int color, int radiusRes, boolean sheen) {
+        float radius = context.getResources().getDimension(radiusRes);
+        float d = context.getResources().getDisplayMetrics().density;
+        boolean dark = StartMenuAdapter.isDarkSurface(context);
+
+        GradientDrawable base = new GradientDrawable();
+        base.setColor(color);
+        base.setCornerRadius(radius);
+        base.setStroke(Math.max(1, Math.round(d)),
+                ColorUtils.setAlphaComponent(StartMenuAdapter.getOnSurfaceColor(context), dark ? 0x2E : 0x26));
+
+        if(!sheen || !dark) return base;
+
+        GradientDrawable shine = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM, new int[] {0x14FFFFFF, 0x00FFFFFF});
+        shine.setCornerRadius(radius);
+        return new LayerDrawable(new Drawable[] {base, shine});
+    }
+
+    /** Search pill for a custom tint: hairline edge, stronger edge while the field has focus. */
+    private Drawable createSearchDrawable(int color) {
+        float radius = context.getResources().getDimension(R.dimen.tb_drawer_search_radius);
+        float d = context.getResources().getDisplayMetrics().density;
+        boolean dark = StartMenuAdapter.isDarkSurface(context);
+
+        GradientDrawable idle = new GradientDrawable();
+        idle.setColor(color);
+        idle.setCornerRadius(radius);
+        idle.setStroke(Math.max(1, Math.round(d)),
+                ColorUtils.setAlphaComponent(StartMenuAdapter.getOnSurfaceColor(context), dark ? 0x2E : 0x26));
+
+        GradientDrawable focused = new GradientDrawable();
+        focused.setColor(color);
+        focused.setCornerRadius(radius);
+        focused.setStroke(Math.round(2 * d), StartMenuAdapter.getOnSurfaceVariantColor(context));
+
+        StateListDrawable states = new StateListDrawable();
+        states.addState(new int[] {android.R.attr.state_focused}, focused);
+        states.addState(new int[] {}, idle);
+        return states;
+    }
+
+    /** Offset (x, y) that points away from the taskbar, so the drawer slides out of it. */
+    private float[] drawerOffset(float magnitude) {
+        if(TaskbarPosition.isVertical(context))
+            return new float[] {TaskbarPosition.isLeft(context) ? -magnitude : magnitude, 0f};
+
+        return new float[] {0f, TaskbarPosition.isBottom(context) ? magnitude : -magnitude};
+    }
+
+    /** Scale grows from the corner that is closest to the taskbar. */
+    private void applyDrawerPivot() {
+        float w = layout.getWidth();
+        float h = layout.getHeight();
+
+        layout.setPivotX(TaskbarPosition.isLeft(context) ? 0f : (TaskbarPosition.isRight(context) ? w : w / 2f));
+
+        if(TaskbarPosition.isVertical(context))
+            layout.setPivotY(h / 2f);
+        else
+            layout.setPivotY(TaskbarPosition.isBottom(context) ? h : 0f);
+    }
+
+    private void animateDrawerIn() {
+        // Closed again before the delayed open ran: stay closed
+        if(!MenuHelper.getInstance().isStartMenuOpen()) return;
+
+        float d = context.getResources().getDisplayMetrics().density;
+        float[] from = drawerOffset(12 * d);
+
+        layout.animate().cancel();
+        applyDrawerPivot();
+        layout.setTranslationX(from[0]);
+        layout.setTranslationY(from[1]);
+        layout.setScaleX(0.97f);
+        layout.setScaleY(0.97f);
+        layout.setAlpha(0f);
+
+        layout.animate()
+                .alpha(1f)
+                .scaleX(1f)
+                .scaleY(1f)
+                .translationX(0f)
+                .translationY(0f)
+                .setDuration(DRAWER_ENTER_MS)
+                .setInterpolator(new PathInterpolator(0.2f, 0f, 0f, 1f))
+                .start();
+    }
+
+    private void animateDrawerOut() {
+        float d = context.getResources().getDisplayMetrics().density;
+        float[] to = drawerOffset(8 * d);
+
+        layout.animate().cancel();
+        applyDrawerPivot();
+        layout.animate()
+                .alpha(0f)
+                .scaleX(0.98f)
+                .scaleY(0.98f)
+                .translationX(to[0])
+                .translationY(to[1])
+                .setDuration(DRAWER_EXIT_MS)
+                .setInterpolator(new PathInterpolator(0.3f, 0f, 0.8f, 0.15f))
+                .start();
+    }
+
+    private void resetDrawerTransform() {
+        layout.animate().cancel();
+        layout.setTranslationX(0f);
+        layout.setTranslationY(0f);
+        layout.setScaleX(1f);
+        layout.setScaleY(1f);
+        layout.setAlpha(0f);
     }
 
     private void toggleStartMenu() {
@@ -703,7 +823,7 @@ public class StartMenuController extends UIController {
 
             U.newHandler().postDelayed(() -> {
                 if(Build.VERSION.SDK_INT > Build.VERSION_CODES.N_MR1 || hasHardwareKeyboard)
-                    layout.setAlpha(1);
+                    animateDrawerIn();
 
                 if(hasHardwareKeyboard) {
                     searchView.setIconifiedByDefault(false);
@@ -742,7 +862,7 @@ public class StartMenuController extends UIController {
     private void hideStartMenu(boolean shouldReset) {
         if(layout.getVisibility() == View.VISIBLE) {
             layout.setOnClickListener(null);
-            layout.setAlpha(0);
+            animateDrawerOut();
 
             MenuHelper.getInstance().setStartMenuOpen(false);
 
@@ -750,6 +870,7 @@ public class StartMenuController extends UIController {
 
             layout.postDelayed(() -> {
                 layout.setVisibility(View.GONE);
+                resetDrawerTransform();
 
                 if(searchViewClicked || hasHardwareKeyboard) {
                     if(!hasHardwareKeyboard)
@@ -768,7 +889,7 @@ public class StartMenuController extends UIController {
 
                 InputMethodManager imm = (InputMethodManager) context.getSystemService(Context.INPUT_METHOD_SERVICE);
                 imm.hideSoftInputFromWindow(layout.getWindowToken(), 0);
-            }, 100);
+            }, DRAWER_EXIT_MS + 30);
         }
     }
 
