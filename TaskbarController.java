@@ -289,8 +289,13 @@ public class TaskbarController extends UIController {
             refreshInterval = 100;
 
         sortOrder = pref.getString(PREF_SORT_ORDER, "false");
+        // The "Running apps only" choice is hidden unless Taskbar is a system app. ClipSync's own
+        // open-apps list (getAppEntries -> TaskSource.getOpenEntries) already shows only running
+        // apps, so treat it as running-apps-only too. That turns on the running bars and the
+        // app-switch animation.
         runningAppsOnly =
-                PREF_RECENTS_AMOUNT_RUNNING_APPS_ONLY
+                com.clipsync.app.TaskSource.enabled(context)
+                        || PREF_RECENTS_AMOUNT_RUNNING_APPS_ONLY
                         .equals(pref.getString(PREF_RECENTS_AMOUNT, PREF_RECENTS_AMOUNT_PAST_DAY));
         searchInterval = getSearchInterval(pref);
 
