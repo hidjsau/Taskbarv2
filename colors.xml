@@ -47,7 +47,7 @@
     <color name="tb_desktop_icon_shadow">#000000</color>
 
     <!-- Collapsed hide pill: dark fill + light outline so it reads on any background -->
-    <color name="tb_pill_fill">#D9202124</color>
-    <color name="tb_pill_outline">#66FFFFFF</color>
+    <color name="tb_pill_fill">#99202124</color>
+    <color name="tb_pill_outline">#59FFFFFF</color>
 
 </resources>

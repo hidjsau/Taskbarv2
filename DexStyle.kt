@@ -80,6 +80,8 @@ object DexStyle {
         }
     }
 
+    const val DIVIDER_TAG = "clipsync_divider"
+
     private fun addDivider(layout: View) {
         val ctx = layout.context
         val start = layout.findViewById<View>(R.id.start_button) ?: return
@@ -91,6 +93,7 @@ object DexStyle {
         shape.cornerRadius = d
         shape.setColor((U.getAccentColor(ctx) and 0x00FFFFFF) or (0x40 shl 24))
         line.background = shape
+        line.tag = DIVIDER_TAG
         val lp = LinearLayout.LayoutParams(Math.max(1, Math.round(d)), (22 * d).toInt())
         lp.gravity = Gravity.CENTER_VERTICAL
         lp.marginStart = (4 * d).toInt()

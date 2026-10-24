@@ -59,6 +59,9 @@ object CollapseStyle {
             state[layout] = collapsed
             // flat bar background only while expanded (no grey box behind the handle)
             layout.setBackgroundColor(if (collapsed) 0 else U.getBackgroundTint(ctx))
+            // the thin divider next to the start button must not show (or take space) when collapsed
+            layout.findViewWithTag<View>(DexStyle.DIVIDER_TAG)?.visibility =
+                if (collapsed) View.GONE else View.VISIBLE
             style(ctx, button, collapsed)
             layout.postDelayed({ place(ctx, layout) }, 80)
         } catch (e: Exception) {
@@ -116,7 +119,7 @@ object CollapseStyle {
         }
     }
 
-    private const val PILL_IDLE_ALPHA = 0.72f
+    private const val PILL_IDLE_ALPHA = 0.7f
 
     /** Fade in with M3 emphasized easing; full opacity on touch/hover, small press scale. */
     private fun animatePill(button: View) {
