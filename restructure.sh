@@ -17,5 +17,6 @@ move colors.xml          app/src/main/res/values
 move strings.xml         app/src/main/res/values
 move tb_pref_general.xml app/src/main/res/xml
 move U.java              app/src/main/java/com/farmerbb/taskbar/util
+move TaskbarController.java app/src/main/java/com/farmerbb/taskbar/ui
 
 echo "restructure done"
