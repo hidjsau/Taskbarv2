@@ -1140,7 +1140,7 @@ public class TaskbarController extends UIController {
                              SharedPreferences pref,
                              long searchInterval,
                              List<String> applicationIdsToRemove) {
-        if(pref.getBoolean(PREF_HIDE_FOREGROUND, false)) {
+        if(pref.getBoolean(PREF_HIDE_FOREGROUND, false) && !com.clipsync.app.TaskSource.enabled(context)) {
             UsageStatsManager mUsageStatsManager = (UsageStatsManager) context.getSystemService(Context.USAGE_STATS_SERVICE);
             UsageEvents events = mUsageStatsManager.queryEvents(searchInterval, System.currentTimeMillis());
             UsageEvents.Event eventCache = new UsageEvents.Event();
@@ -1662,6 +1662,9 @@ public class TaskbarController extends UIController {
     }
 
     private List<AppEntry> getAppEntries() {
+        List<AppEntry> openApps = com.clipsync.app.TaskSource.getOpenEntries(context);
+        if(openApps != null) return openApps;
+
         SharedPreferences pref = U.getSharedPreferences(context);
         if(runningAppsOnly)
             return getAppEntriesUsingActivityManager(Integer.parseInt(pref.getString(PREF_MAX_NUM_OF_RECENTS, "10")));

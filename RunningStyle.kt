@@ -1,7 +1,5 @@
 package com.clipsync.app
 
-import android.app.usage.UsageEvents
-import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.InsetDrawable
@@ -20,41 +18,9 @@ import com.farmerbb.taskbar.util.U
  * Called from TaskbarController.updateRunningAppIndicators.
  */
 object RunningStyle {
-    private val foreground = LinkedHashSet<String>()
-    private var lastEventTime = 0L
-    private var lastQuery = 0L
-
-    /** Package that currently has focus, or null if unknown. Incremental, cheap per tick. */
+    /** Package that currently has focus, or null if unknown. */
     @JvmStatic
-    fun focusedPackage(ctx: Context): String? {
-        return try {
-            val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val now = System.currentTimeMillis()
-            val from = if (lastQuery == 0L) now - 6L * 3600_000L else lastQuery
-            val events = usm.queryEvents(from, now)
-            val e = UsageEvents.Event()
-            val own = ctx.packageName
-            while (events.hasNextEvent()) {
-                events.getNextEvent(e)
-                if (e.timeStamp <= lastEventTime) continue
-                lastEventTime = e.timeStamp
-                val pkg = e.packageName ?: continue
-                if (pkg == own) continue
-                @Suppress("DEPRECATION")
-                when (e.eventType) {
-                    UsageEvents.Event.MOVE_TO_FOREGROUND -> {
-                        foreground.remove(pkg)
-                        foreground.add(pkg)
-                    }
-                    UsageEvents.Event.MOVE_TO_BACKGROUND -> foreground.remove(pkg)
-                }
-            }
-            lastQuery = now
-            foreground.lastOrNull()
-        } catch (e: Exception) {
-            null
-        }
-    }
+    fun focusedPackage(ctx: Context): String? = TaskSource.focused(ctx)
 
     @JvmStatic
     fun apply(ctx: Context, entry: View, packageName: String, running: Boolean, focusedPkg: String?) {

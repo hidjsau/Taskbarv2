@@ -16,6 +16,8 @@ import android.text.InputType
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Button
+import rikka.shizuku.Shizuku
+import com.farmerbb.taskbar.util.U
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -29,6 +31,9 @@ class MainActivity : Activity() {
     private lateinit var permBox: LinearLayout
     private lateinit var peerBox: LinearLayout
     private lateinit var svcBtn: Button
+    private lateinit var shizukuStatus: TextView
+    private lateinit var shizukuBtn: Button
+    private val shizukuListener = Shizuku.OnRequestPermissionResultListener { _, _ -> h.post { refresh() } }
     private var visible = false
     private val MATCH = ViewGroup.LayoutParams.MATCH_PARENT
     private val WRAP = ViewGroup.LayoutParams.WRAP_CONTENT
@@ -63,6 +68,30 @@ class MainActivity : Activity() {
         root.addView(tv("ClipSync", 26f, true))
 
         permBox = card(root, "Permissions")
+
+        val openCard = card(root, "Open apps list")
+        val openSw = Switch(this)
+        openSw.text = "Show open apps (Windows style)"
+        openSw.isChecked = TaskSource.enabled(this)
+        openSw.setOnCheckedChangeListener { _, on ->
+            U.getSharedPreferences(this).edit().putBoolean(TaskSource.PREF_ENABLED, on).apply()
+        }
+        openCard.addView(openSw)
+        shizukuStatus = tv("", 13f, false, Color.GRAY)
+        openCard.addView(shizukuStatus)
+        shizukuBtn = Button(this)
+        shizukuBtn.setOnClickListener {
+            when (TaskSource.shizukuState()) {
+                1 -> try { Shizuku.requestPermission(77) } catch (t: Throwable) {}
+                0 -> {
+                    val i = try { packageManager.getLaunchIntentForPackage("moe.shizuku.privileged.api") } catch (e: Exception) { null }
+                    if (i != null) startActivity(i)
+                    else Toast.makeText(this, "Install and start the Shizuku app first", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+        openCard.addView(shizukuBtn)
+        openCard.addView(tv("Shizuku is optional. Without it the list is an estimate (apps used in the last 2 hours). With it, the list shows the real open apps.", 12f, false, Color.GRAY))
 
         val bubbleCard = card(root, "Floating bubble")
         val sw = Switch(this)
@@ -161,6 +190,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         visible = true
+        try { Shizuku.addRequestPermissionResultListener(shizukuListener) } catch (t: Throwable) {}
         if (!getSharedPreferences("c", 0).getBoolean("stopped", false)) startSvc()
         h.post(tick)
     }
@@ -168,6 +198,7 @@ class MainActivity : Activity() {
     override fun onPause() {
         super.onPause()
         visible = false
+        try { Shizuku.removeRequestPermissionResultListener(shizukuListener) } catch (t: Throwable) {}
         h.removeCallbacks(tick)
     }
 
@@ -237,6 +268,23 @@ class MainActivity : Activity() {
             }
             row.addView(bu)
             peerBox.addView(row)
+        }
+
+        when (TaskSource.shizukuState()) {
+            2 -> {
+                shizukuStatus.text = "Shizuku: connected (real open apps)"
+                shizukuBtn.visibility = android.view.View.GONE
+            }
+            1 -> {
+                shizukuStatus.text = "Shizuku: running, permission needed"
+                shizukuBtn.text = "Allow Shizuku"
+                shizukuBtn.visibility = android.view.View.VISIBLE
+            }
+            else -> {
+                shizukuStatus.text = "Shizuku: not running (using estimate)"
+                shizukuBtn.text = "Open Shizuku"
+                shizukuBtn.visibility = android.view.View.VISIBLE
+            }
         }
 
         svcBtn.text = if (SyncService.on) "Stop service" else "Start service"
