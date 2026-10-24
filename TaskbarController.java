@@ -1647,6 +1647,7 @@ public class TaskbarController extends UIController {
             }
 
             U.launchApp(context, entry, "true_fullscreen", true, false, view);
+            com.clipsync.app.RunningStyle.onLaunched(context, view, entry.getPackageName());
         });
 
         layout.setOnLongClickListener(view -> {
@@ -1733,6 +1734,7 @@ public class TaskbarController extends UIController {
                     if("fullscreen".equals(windowedSize)) windowedSize = "standard";
 
                     U.launchApp(context, entry, windowedSize, true, false, v);
+                    com.clipsync.app.RunningStyle.onLaunched(context, v, entry.getPackageName());
 
                     if(action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
                         swipedUp[0] = false;
