@@ -21,6 +21,7 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:orientation="vertical"
+    android:padding="@dimen/tb_drawer_edge_gap"
     android:clickable="true"
     android:visibility="gone">
 
@@ -34,8 +35,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:padding="@dimen/tb_drawer_card_padding"
-            android:background="@drawable/tb_drawer_card_bg"
-            android:clipToOutline="true" >
+        android:background="@drawable/tb_drawer_card_bg"
+        android:clipToOutline="true">
 
         <GridView
             android:id="@+id/start_menu"
@@ -59,19 +60,19 @@
 
     <FrameLayout
         android:id="@+id/search_view_layout"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingLeft="@dimen/tb_drawer_card_padding"
-            android:paddingTop="@dimen/tb_drawer_gap"
-            android:paddingRight="@dimen/tb_drawer_card_padding" >
+        android:layout_marginTop="@dimen/tb_drawer_gap">
 
         <LinearLayout
             android:id="@+id/search_view_child_layout"
-            android:layout_width="@dimen/tb_start_menu_width"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:minHeight="@dimen/tb_drawer_search_height"
             android:background="@drawable/tb_drawer_search_bg"
-                    android:paddingRight="4dp"
-                    android:gravity="center_vertical" >
+            android:paddingLeft="8dp"
+            android:paddingRight="4dp"
+            android:gravity="center_vertical">
 
             <androidx.appcompat.widget.SearchView
                 android:id="@+id/search"
@@ -86,15 +87,15 @@
                 android:layout_width="48dp"
                 android:layout_height="48dp"
                 android:clickable="true"
-                            android:background="@drawable/tb_drawer_icon_button_bg"
-                            android:contentDescription="@string/tb_drawer_more_options" >
+                android:background="@drawable/tb_drawer_icon_button_bg"
+                android:contentDescription="@string/tb_drawer_more_options">
 
                 <ImageView
+                    android:id="@+id/power_button_icon"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_gravity="center"
-                    android:src="@drawable/tb_more_vert"
-                                    android:tint="?tb_drawer_on_surface_variant" />
+                    android:src="@drawable/tb_more_vert" />
 
             </LinearLayout>
 

@@ -72,6 +72,24 @@ public class StartMenuAdapter extends ArrayAdapter<AppEntry> implements SectionI
             'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
     );
 
+    // Drawer text/icon colors follow the real surface (custom tint or theme), so they stay readable
+    // even when a dark tint is used with the light theme (or the other way around).
+    public static boolean isDarkSurface(Context context) {
+        SharedPreferences pref = U.getSharedPreferences(context);
+        if(!pref.getBoolean(PREF_TRANSPARENT_START_MENU, false) && pref.contains(PREF_BACKGROUND_TINT))
+            return ColorUtils.calculateLuminance(U.getBackgroundTint(context) | 0xFF000000) < 0.5;
+
+        return U.isDarkTheme(context);
+    }
+
+    public static int getOnSurfaceColor(Context context) {
+        return isDarkSurface(context) ? 0xFFD9DBE0 : 0xFF33363B;
+    }
+
+    public static int getOnSurfaceVariantColor(Context context) {
+        return isDarkSurface(context) ? 0xFFAEB2BA : 0xFF5C6068;
+    }
+
     // Drawer item layouts read theme attributes, so they must be inflated with the Taskbar theme
     private final Context themedContext;
 
@@ -98,6 +116,7 @@ public class StartMenuAdapter extends ArrayAdapter<AppEntry> implements SectionI
 
         TextView textView = convertView.findViewById(R.id.name);
         textView.setText(pref.getBoolean(PREF_HIDE_ICON_LABELS, false) ? "" : entry.getLabel());
+        textView.setTextColor(getOnSurfaceColor(getContext()));
         textView.setTypeface(null, isTopApp(entry) ? Typeface.BOLD : Typeface.NORMAL);
 
         ImageView imageView = convertView.findViewById(R.id.icon);
@@ -119,9 +138,17 @@ public class StartMenuAdapter extends ArrayAdapter<AppEntry> implements SectionI
         boolean visualFeedbackEnabled = pref.getBoolean(PREF_VISUAL_FEEDBACK, true);
 
         // The item background is a ripple + hover state layer; drop it when visual feedback is off
-        layout.setBackground(visualFeedbackEnabled
+        android.graphics.drawable.Drawable itemBg = visualFeedbackEnabled
                 ? ContextCompat.getDrawable(themedContext, R.drawable.tb_drawer_item_bg)
-                : null);
+                : null;
+
+        if(itemBg instanceof android.graphics.drawable.RippleDrawable) {
+            int layer = isDarkSurface(getContext()) ? 0x29FFFFFF : 0x29000000;
+            ((android.graphics.drawable.RippleDrawable) itemBg)
+                    .setColor(android.content.res.ColorStateList.valueOf(layer));
+        }
+
+        layout.setBackground(itemBg);
 
         layout.setOnGenericMotionListener((view, motionEvent) -> {
             int action = motionEvent.getAction();

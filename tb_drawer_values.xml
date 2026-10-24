@@ -26,11 +26,13 @@
     <color name="tb_drawer_state_layer_dark">#29E6E0E9</color>
     <color name="tb_drawer_hover_dark">#14E6E0E9</color>
 
-    <dimen name="tb_drawer_card_radius">24dp</dimen>
-    <dimen name="tb_drawer_card_padding">8dp</dimen>
+    <dimen name="tb_drawer_card_radius">28dp</dimen>
+    <dimen name="tb_drawer_card_padding">12dp</dimen>
     <dimen name="tb_drawer_search_radius">28dp</dimen>
-    <dimen name="tb_drawer_gap">8dp</dimen>
+    <dimen name="tb_drawer_gap">12dp</dimen>
     <dimen name="tb_drawer_item_radius">16dp</dimen>
     <dimen name="tb_drawer_item_inset">2dp</dimen>
 
+    <dimen name="tb_drawer_edge_gap">12dp</dimen>
+    <dimen name="tb_drawer_search_height">52dp</dimen>
 </resources>

@@ -28,6 +28,7 @@ import android.content.pm.LauncherActivityInfo;
 import android.content.pm.LauncherApps;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
+import android.graphics.PorterDuff;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -52,6 +53,7 @@ import android.webkit.URLUtil;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.GridView;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListAdapter;
 import android.widget.TextView;
@@ -236,6 +238,8 @@ public class StartMenuController extends UIController {
                     .setBackground(createRoundedDrawable(backgroundTint, R.dimen.tb_drawer_search_radius));
         }
 
+        applyDrawerColors(shouldShowSearchBox);
+
         if(shouldShowSearchBox) {
             if(!hasHardwareKeyboard) searchView.setIconifiedByDefault(true);
 
@@ -333,11 +337,7 @@ public class StartMenuController extends UIController {
             if(pref.getBoolean(PREF_TRANSPARENT_START_MENU, false))
                 childLayout.setBackgroundColor(0);
 
-            if(isGrid) {
-                ViewGroup.LayoutParams childLayoutParams = childLayout.getLayoutParams();
-                childLayoutParams.width = (int) (childLayoutParams.width * (columns / 3f));
-                childLayout.setLayoutParams(childLayoutParams);
-            }
+            // Search bar is match_parent, so it always has exactly the same width as the card.
         } else
             searchViewLayout.setVisibility(View.GONE);
 
@@ -401,18 +401,18 @@ public class StartMenuController extends UIController {
     int getStartMenuGravity(String taskbarPosition) {
         switch(taskbarPosition) {
             case POSITION_BOTTOM_LEFT:
-            case POSITION_BOTTOM_VERTICAL_LEFT:
-            default:
-                return Gravity.BOTTOM | Gravity.LEFT;
             case POSITION_BOTTOM_RIGHT:
-            case POSITION_BOTTOM_VERTICAL_RIGHT:
-                return Gravity.BOTTOM | Gravity.RIGHT;
+            default:
+                return Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
             case POSITION_TOP_LEFT:
-            case POSITION_TOP_VERTICAL_LEFT:
-                return Gravity.TOP | Gravity.LEFT;
             case POSITION_TOP_RIGHT:
+                return Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            case POSITION_BOTTOM_VERTICAL_LEFT:
+            case POSITION_TOP_VERTICAL_LEFT:
+                return Gravity.CENTER_VERTICAL | Gravity.LEFT;
+            case POSITION_BOTTOM_VERTICAL_RIGHT:
             case POSITION_TOP_VERTICAL_RIGHT:
-                return Gravity.TOP | Gravity.RIGHT;
+                return Gravity.CENTER_VERTICAL | Gravity.RIGHT;
         }
     }
 
@@ -609,6 +609,33 @@ public class StartMenuController extends UIController {
             entries.add(newEntry);
         }
         return entries;
+    }
+
+    private void applyDrawerColors(boolean hasSearch) {
+        int onSurface = StartMenuAdapter.getOnSurfaceColor(context);
+        int variant = StartMenuAdapter.getOnSurfaceVariantColor(context);
+
+        ((TextView) layout.findViewById(R.id.no_apps_found)).setTextColor(variant);
+
+        if(!hasSearch) return;
+
+        ImageView more = layout.findViewById(R.id.power_button_icon);
+        more.setColorFilter(variant, PorterDuff.Mode.SRC_IN);
+
+        EditText editText = searchView.findViewById(com.google.android.material.R.id.search_src_text);
+        if(editText != null) {
+            editText.setTextColor(onSurface);
+            editText.setHintTextColor(variant);
+        }
+
+        ImageView magIcon = searchView.findViewById(com.google.android.material.R.id.search_mag_icon);
+        if(magIcon != null) magIcon.setColorFilter(variant, PorterDuff.Mode.SRC_IN);
+
+        ImageView searchButton = searchView.findViewById(com.google.android.material.R.id.search_button);
+        if(searchButton != null) searchButton.setColorFilter(variant, PorterDuff.Mode.SRC_IN);
+
+        ImageView closeIcon = searchView.findViewById(com.google.android.material.R.id.search_close_btn);
+        if(closeIcon != null) closeIcon.setColorFilter(variant, PorterDuff.Mode.SRC_IN);
     }
 
     private GradientDrawable createRoundedDrawable(int color, int radiusRes) {
