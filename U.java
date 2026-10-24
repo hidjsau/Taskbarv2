@@ -117,6 +117,10 @@ public class U {
     private static final int MAXIMIZED = 0;
     private static final int LEFT = -1;
     private static final int RIGHT = 1;
+    private static final int TOP_HALF = 2;
+    private static final int BOTTOM_HALF = 3;
+    private static final int LEFT_HALF = 4;
+    private static final int RIGHT_HALF = 5;
 
     public static final int HIDDEN = 0;
     public static final int TOP_APPS = 1;
@@ -541,7 +545,16 @@ public class U {
         int halfPortrait =
                 (bottom / 2) + ((iconSize / 2) * ((isTopLeft || isTopRight) ? 1 : 0));
 
-        if(launchType == RIGHT && isLandscape)
+        // Absolute halves (independent of device orientation)
+        if(launchType == TOP_HALF)
+            bottom = top + ((bottom - top) / 2);
+        else if(launchType == BOTTOM_HALF)
+            top = top + ((bottom - top) / 2);
+        else if(launchType == LEFT_HALF)
+            right = left + ((right - left) / 2);
+        else if(launchType == RIGHT_HALF)
+            left = left + ((right - left) / 2);
+        else if(launchType == RIGHT && isLandscape)
             left = halfLandscape;
         else if(launchType == RIGHT && isPortrait)
             top = halfPortrait;
@@ -1038,6 +1051,14 @@ public class U {
                 return launchMode1(context, type, view, 8);
             case "fullscreen":
                 return launchMode2(context, MAXIMIZED, type, view);
+            case "split_top":
+                return launchMode2(context, TOP_HALF, type, view);
+            case "split_bottom":
+                return launchMode2(context, BOTTOM_HALF, type, view);
+            case "split_left":
+                return launchMode2(context, LEFT_HALF, type, view);
+            case "split_right":
+                return launchMode2(context, RIGHT_HALF, type, view);
             case "half_left":
                 return launchMode2(context, LEFT, type, view);
             case "half_right":
@@ -1094,6 +1115,42 @@ public class U {
         return context.getPackageName().equals(BuildConfig.ANDROIDX86_APPLICATION_ID)
                 ? ApplicationType.APP_LANDSCAPE
                 : ApplicationType.APP_PORTRAIT;
+    }
+
+    /**
+     * Closes an app, removing it from recents when the system allows it.
+     * 1) removeTask() on every recent task of the package (needs REMOVE_TASKS, i.e. system-app installs)
+     * 2) otherwise kills the app's background processes.
+     */
+    @SuppressWarnings({"deprecation", "JavaReflectionMemberAccess"})
+    public static boolean closeApp(Context context, String packageName) {
+        ActivityManager am = (ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE);
+        boolean removed = false;
+
+        try {
+            allowReflection();
+            Method removeTask = ActivityManager.class.getMethod("removeTask", int.class);
+
+            for(ActivityManager.RecentTaskInfo info : am.getRecentTasks(100, 0)) {
+                String pkg = info.baseActivity != null
+                        ? info.baseActivity.getPackageName()
+                        : info.baseIntent != null && info.baseIntent.getComponent() != null
+                                ? info.baseIntent.getComponent().getPackageName()
+                                : null;
+
+                if(packageName.equals(pkg)) {
+                    int id = info.persistentId != -1 ? info.persistentId : info.id;
+                    Object result = removeTask.invoke(am, id);
+                    if(result instanceof Boolean && (Boolean) result) removed = true;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        try {
+            am.killBackgroundProcesses(packageName);
+        } catch (Exception ignored) {}
+
+        return removed;
     }
 
     public static boolean isSystemApp(Context context) {

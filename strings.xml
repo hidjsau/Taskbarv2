@@ -193,6 +193,14 @@
 
     <string name="tb_pref_max_num_of_recents">Max number of recent/pinned apps</string>
 
+    <string name="tb_launch_fullscreen">Open in full screen</string>
+    <string name="tb_launch_window">Open in window mode</string>
+    <string name="tb_launch_split_top">Open in upper half split screen</string>
+    <string name="tb_launch_split_bottom">Open in lower half split screen</string>
+    <string name="tb_launch_split_left">Open in left half split screen</string>
+    <string name="tb_launch_split_right">Open in right half split screen</string>
+    <string name="tb_close_app">Close app (also from recents)</string>
+    <string name="tb_close_app_partial">Stopped the app, but the system did not let Taskbar remove it from recents</string>
     <string name="tb_show_window_sizes">New window&#8230;</string>
 
     <string name="tb_icon_pack">Icon pack</string>

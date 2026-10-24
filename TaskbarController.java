@@ -68,6 +68,7 @@ import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.PointerIcon;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
@@ -1594,14 +1595,19 @@ public class TaskbarController extends UIController {
         }
 
         FrameLayout layout = convertView.findViewById(R.id.entry);
-        layout.setOnClickListener(view -> U.launchApp(
-                context,
-                entry,
-                null,
-                true,
-                false,
-                view
-        ));
+        // Gesture support:
+        //   tap              -> open app fullscreen (maximized)
+        //   drag icon upward -> open app in normal (windowed) mode
+        final boolean[] swipedUp = {false};
+
+        layout.setOnClickListener(view -> {
+            if(swipedUp[0]) {
+                swipedUp[0] = false;
+                return;
+            }
+
+            U.launchApp(context, entry, "fullscreen", true, false, view);
+        });
 
         layout.setOnLongClickListener(view -> {
             int[] location = new int[2];
@@ -1643,11 +1649,37 @@ public class TaskbarController extends UIController {
                 return false;
             });
 
-            layout.setOnTouchListener((v, event) -> {
-                v.setAlpha(event.getAction() == MotionEvent.ACTION_DOWN || event.getAction() == MotionEvent.ACTION_MOVE ? 0.5f : 1);
-                return false;
-            });
         }
+
+        final float swipeThreshold = Math.max(
+                ViewConfiguration.get(context).getScaledTouchSlop() * 2,
+                context.getResources().getDisplayMetrics().density * 16
+        );
+        final float[] downY = {0};
+        final boolean visualFeedback = pref.getBoolean(PREF_VISUAL_FEEDBACK, true);
+
+        layout.setOnTouchListener((v, event) -> {
+            int action = event.getAction();
+
+            if(visualFeedback)
+                v.setAlpha(action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE ? 0.5f : 1);
+
+            if(action == MotionEvent.ACTION_DOWN) {
+                swipedUp[0] = false;
+                downY[0] = event.getY();
+            } else if(action == MotionEvent.ACTION_UP
+                    && downY[0] - event.getY() > swipeThreshold) {
+                // Dragged upward: launch in normal windowed mode instead of fullscreen
+                swipedUp[0] = true;
+
+                String windowedSize = pref.getString(PREF_WINDOW_SIZE, "standard");
+                if("fullscreen".equals(windowedSize)) windowedSize = "standard";
+
+                U.launchApp(context, entry, windowedSize, true, false, v);
+            }
+
+            return false;
+        });
 
         return convertView;
     }

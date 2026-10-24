@@ -18,5 +18,15 @@ move strings.xml         app/src/main/res/values
 move tb_pref_general.xml app/src/main/res/xml
 move U.java              app/src/main/java/com/farmerbb/taskbar/util
 move TaskbarController.java app/src/main/java/com/farmerbb/taskbar/ui
+move Constants.java         app/src/main/java/com/farmerbb/taskbar/util
+move ContextMenuActivity.java app/src/main/java/com/farmerbb/taskbar/activity
+move tb_pref_context_menu_launch_options.xml app/src/main/res/xml
+
+# "Close app" fallback needs this permission (idempotent)
+MF=app/src/playstore/AndroidManifest.xml
+if [ -f "$MF" ] && ! grep -q KILL_BACKGROUND_PROCESSES "$MF"; then
+  sed -i '0,/<uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"/s//<uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" \/>\n    &/' "$MF"
+  echo "added KILL_BACKGROUND_PROCESSES"
+fi
 
 echo "restructure done"
