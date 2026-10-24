@@ -40,7 +40,8 @@ object BarTheme {
         val outer: Int,          // colour on the screen-edge side
         val stops: IntArray? = null, // optional colours along the bar (instead of inner/outer)
         val rounded: Boolean = true,
-        val highlight: Boolean = true
+        val highlight: Boolean = true,
+        val shade: Boolean = true    // dark shade towards the screen edge on multi-colour themes
     )
 
     private fun c(v: Long) = v.toInt()
@@ -53,7 +54,29 @@ object BarTheme {
         Def("rose", "Rose", c(0xFF5A2A44), c(0xFF1E1020)),
         Def("ocean", "Ocean", c(0xFF0F5C6B), c(0xFF07222B)),
         Def("accent", "Accent", 0, 0),   // built from the accent colour
-        Def("amoled", "AMOLED black", c(0xFF000000), c(0xFF000000), rounded = false, highlight = false)
+        Def("amoled", "AMOLED black", c(0xFF000000), c(0xFF000000), rounded = false, highlight = false),
+
+        // Premium designs (two-colour gradient along the bar, no extra shading)
+        Def("obsidian_gold", "Obsidian Gold", 0, 0,
+            stops = intArrayOf(c(0xFF0B0B0F), c(0xFF8A6D2B)), shade = false),
+        Def("emerald_luxe", "Emerald Luxe", 0, 0,
+            stops = intArrayOf(c(0xFF04251C), c(0xFF0F7A5C)), shade = false),
+        Def("sapphire_night", "Sapphire Night", 0, 0,
+            stops = intArrayOf(c(0xFF0A1A3F), c(0xFF2457C5)), shade = false),
+        Def("amethyst_velvet", "Amethyst Velvet", 0, 0,
+            stops = intArrayOf(c(0xFF1A0B2E), c(0xFF6B3FA0)), shade = false),
+        Def("crimson_noir", "Crimson Noir", 0, 0,
+            stops = intArrayOf(c(0xFF1A0509), c(0xFF8C1D2F)), shade = false),
+        Def("titanium_steel", "Titanium Steel", 0, 0,
+            stops = intArrayOf(c(0xFF1C1F24), c(0xFF5C6670)), shade = false),
+        Def("rose_gold_dusk", "Rose Gold Dusk", 0, 0,
+            stops = intArrayOf(c(0xFF3B2530), c(0xFFB76E79)), shade = false),
+        Def("midnight_aurora", "Midnight Aurora", 0, 0,
+            stops = intArrayOf(c(0xFF0B1B33), c(0xFF1FA89A)), shade = false),
+        Def("copper_bronze", "Copper Bronze", 0, 0,
+            stops = intArrayOf(c(0xFF2A1810), c(0xFFA8642F)), shade = false),
+        Def("graphite_violet", "Graphite Violet", 0, 0,
+            stops = intArrayOf(c(0xFF15141C), c(0xFF4B3F72)), shade = false)
     )
 
     private fun find(id: String): Def = defs.firstOrNull { it.id == id } ?: defs[0]
@@ -133,7 +156,7 @@ object BarTheme {
         layers.add(body)
 
         // multi-colour themes get a dark shade towards the screen edge so they stay calm
-        if (def.stops != null) {
+        if (def.stops != null && def.shade) {
             val shade = GradientDrawable(
                 orientation(pos),
                 intArrayOf(0x00000000, withAlpha(Color.BLACK, Math.round(a * 0.45f)))
