@@ -18,7 +18,7 @@ import java.net.Socket
 import java.security.SecureRandom
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
-import kotlin.concurrent.thread
+import java.util.concurrent.Executors
 
 fun Context.canOverlay(): Boolean =
     Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(this)
@@ -48,26 +48,39 @@ object Peers {
     val seen = ConcurrentHashMap<String, Long>()
     val ip = ConcurrentHashMap<String, String>()
 
-    private fun clean(s: String) = s.replace(Regex("[\t\n|]"), " ")
+    private val dirty = Regex("[\t\n|]")
+    private fun clean(s: String) = s.replace(dirty, " ")
+
+    // The list is read from settings once and kept in memory (it used to be parsed again
+    // for every single packet).
+    private var cached: List<Peer>? = null
 
     @Synchronized
     fun list(ctx: Context): List<Peer> {
+        cached?.let { return it }
         val raw = ctx.getSharedPreferences("c", 0).getString("peers", "") ?: ""
-        return raw.split("\n").mapNotNull { line ->
+        val l = raw.split("\n").mapNotNull { line ->
             val f = line.split("\t")
             if (f.size == 3) Peer(f[0], f[1], f[2]) else null
         }
+        cached = l
+        return l
     }
 
     @Synchronized
     private fun save(ctx: Context, l: List<Peer>) {
+        cached = l
         val s = l.joinToString("\n") { "${it.id}\t${it.name}\t${it.pin}" }
         ctx.getSharedPreferences("c", 0).edit().putString("peers", s).apply()
     }
 
     @Synchronized
     fun add(ctx: Context, p: Peer) {
-        save(ctx, list(ctx).filter { it.id != p.id } + Peer(p.id, clean(p.name), p.pin))
+        val old = list(ctx).firstOrNull { it.id == p.id }
+        val name = clean(p.name)
+        // already known and unchanged (this happens on every pairing packet): nothing to save
+        if (old != null && old.name == name && old.pin == p.pin) return
+        save(ctx, list(ctx).filter { it.id != p.id } + Peer(p.id, name, p.pin))
     }
 
     @Synchronized
@@ -80,17 +93,27 @@ object Peers {
     fun has(ctx: Context, id: String): Boolean = list(ctx).any { it.id == id }
 
     fun online(id: String): Boolean =
-        System.currentTimeMillis() - (seen[id] ?: 0L) < 25000
+        System.currentTimeMillis() - (seen[id] ?: 0L) < 50000
 }
 
 object History {
     @Volatile
     var version = 0
 
+    // The list is kept in memory. It is written to settings later, in the background, at most
+    // once a second, so receiving a message never waits for the file (and the main thread is
+    // never held up by a pending write).
+    private var cache: List<Msg>? = null
+    private var writePending = false
+    private val writer = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "clipsync-history").apply { isDaemon = true }
+    }
+
     @Synchronized
     fun load(ctx: Context): List<Msg> {
+        cache?.let { return it }
         val raw = ctx.getSharedPreferences("h", 0).getString("l", "[]") ?: "[]"
-        return try {
+        val l = try {
             val a = JSONArray(raw)
             (0 until a.length()).map {
                 val o = a.getJSONObject(it)
@@ -99,24 +122,48 @@ object History {
         } catch (e: Exception) {
             emptyList()
         }
+        cache = l
+        return l
     }
 
     @Synchronized
     fun add(ctx: Context, sent: Boolean, text: String, who: String) {
         val all = load(ctx) + Msg(sent, text, who, System.currentTimeMillis())
-        val keep = (all.filter { it.sent }.takeLast(15) + all.filter { !it.sent }.takeLast(15))
+        cache = (all.filter { it.sent }.takeLast(15) + all.filter { !it.sent }.takeLast(15))
             .sortedBy { it.time }
-        val a = JSONArray()
-        for (m in keep) {
-            val o = JSONObject()
-            o.put("s", m.sent)
-            o.put("t", m.text)
-            o.put("w", m.who)
-            o.put("m", m.time)
-            a.put(o)
-        }
-        ctx.getSharedPreferences("h", 0).edit().putString("l", a.toString()).apply()
         version++
+        scheduleWrite(ctx.applicationContext)
+    }
+
+    private fun scheduleWrite(app: Context) {
+        if (writePending) return
+        writePending = true
+        writer.execute {
+            try {
+                Thread.sleep(1000)
+            } catch (e: InterruptedException) {
+            }
+            val snapshot: List<Msg>?
+            synchronized(this) {
+                writePending = false
+                snapshot = cache
+            }
+            if (snapshot != null) {
+                val a = JSONArray()
+                for (m in snapshot) {
+                    val o = JSONObject()
+                    o.put("s", m.sent)
+                    o.put("t", m.text)
+                    o.put("w", m.who)
+                    o.put("m", m.time)
+                    a.put(o)
+                }
+                try {
+                    app.getSharedPreferences("h", 0).edit().putString("l", a.toString()).commit()
+                } catch (e: Exception) {
+                }
+            }
+        }
     }
 }
 
@@ -153,42 +200,113 @@ object Net {
 
     fun myName(): String = Build.MODEL.replace("|", " ")
 
-    fun broadcast(data: ByteArray) {
+    // One UDP socket is reused for every packet (it used to be created and closed per packet).
+    @Volatile
+    private var sendSock: DatagramSocket? = null
+
+    @Synchronized
+    private fun socket(): DatagramSocket {
+        sendSock?.let { if (!it.isClosed) return it }
+        val s = DatagramSocket()
+        s.broadcast = true
+        sendSock = s
+        return s
+    }
+
+    @Synchronized
+    private fun resetSocket() {
         try {
-            val s = DatagramSocket()
-            s.broadcast = true
-            try {
-                s.send(DatagramPacket(data, data.size, InetAddress.getByName("255.255.255.255"), PORT))
-            } catch (e: Exception) {
-            }
-            try {
-                val ifs = NetworkInterface.getNetworkInterfaces()
-                while (ifs != null && ifs.hasMoreElements()) {
-                    val n = ifs.nextElement()
-                    if (!n.isUp || n.isLoopback) continue
-                    for (a in n.interfaceAddresses) {
-                        val b = a.broadcast ?: continue
-                        try {
-                            s.send(DatagramPacket(data, data.size, b, PORT))
-                        } catch (e: Exception) {
-                        }
-                    }
-                }
-            } catch (e: Exception) {
-            }
-            s.close()
+            sendSock?.close()
         } catch (e: Exception) {
+        }
+        sendSock = null
+    }
+
+    // Broadcast addresses of the networks that are up. Looked up at most every 15 s
+    // instead of before every packet.
+    private const val ADDR_TTL_MS = 15_000L
+    @Volatile
+    private var bcastAddrs: List<InetAddress> = emptyList()
+    @Volatile
+    private var bcastTime = 0L
+
+    fun invalidateAddresses() {
+        bcastTime = 0L
+    }
+
+    private fun broadcastAddresses(): List<InetAddress> {
+        val now = System.currentTimeMillis()
+        val cached = bcastAddrs
+        if (cached.isNotEmpty() && now - bcastTime < ADDR_TTL_MS) return cached
+        val found = ArrayList<InetAddress>()
+        try {
+            val ifs = NetworkInterface.getNetworkInterfaces()
+            while (ifs != null && ifs.hasMoreElements()) {
+                val n = ifs.nextElement()
+                if (!n.isUp || n.isLoopback) continue
+                for (a in n.interfaceAddresses) {
+                    val b = a.broadcast ?: continue
+                    if (!found.contains(b)) found.add(b)
+                }
+            }
+        } catch (e: Exception) {
+        }
+        bcastAddrs = found
+        bcastTime = now
+        return found
+    }
+
+    /** Sends one packet to the broadcast address of every network (once each). */
+    fun broadcast(data: ByteArray) {
+        var sent = false
+        try {
+            val s = socket()
+            for (a in broadcastAddresses()) {
+                try {
+                    s.send(DatagramPacket(data, data.size, a, PORT))
+                    sent = true
+                } catch (e: Exception) {
+                }
+            }
+            if (!sent) {
+                // no network address found: fall back to the global broadcast address
+                try {
+                    s.send(DatagramPacket(data, data.size, InetAddress.getByName("255.255.255.255"), PORT))
+                    sent = true
+                } catch (e: Exception) {
+                }
+            }
+        } catch (e: Exception) {
+        }
+        if (!sent) {
+            // network probably changed: start fresh next time
+            invalidateAddresses()
+            resetSocket()
         }
     }
 
-    fun sendTo(pin: String, plain: String) = broadcast(Crypto.enc(pin, plain))
+    /** Sends straight to one device. False when it could not be sent. */
+    private fun unicast(ip: String, data: ByteArray): Boolean = try {
+        socket().send(DatagramPacket(data, data.size, InetAddress.getByName(ip), PORT))
+        true
+    } catch (e: Exception) {
+        resetSocket()
+        false
+    }
 
-    private const val CHUNK = 250
+    /** [ip] given: send straight to that device (no broadcast). Otherwise, or if that fails: broadcast. */
+    fun sendTo(pin: String, plain: String, ip: String? = null) {
+        val data = Crypto.enc(pin, plain)
+        if (ip != null && unicast(ip, data)) return
+        broadcast(data)
+    }
+
+    private const val CHUNK = 400
 
     /** Short text goes as one packet. Long text goes as many small packets (no IP fragmentation). */
     private fun sendTcp(addr: String, data: ByteArray): Boolean = try {
         Socket().use { s ->
-            s.connect(InetSocketAddress(addr, TCP_PORT), 3000)
+            s.connect(InetSocketAddress(addr, TCP_PORT), 1500)
             s.soTimeout = 8000
             val o = DataOutputStream(s.getOutputStream())
             o.writeInt(data.size)
@@ -224,10 +342,16 @@ object Net {
         for (round in 0 until 2) {
             for ((n, p) in parts.withIndex()) {
                 sendTo(pin, "C|$id|$name|$mid:$n:${parts.size}:$p")
-                Thread.sleep(3)
+                Thread.sleep(2)
             }
-            Thread.sleep(250)
+            Thread.sleep(150)
         }
+    }
+
+    // A few worker threads send to the paired devices in parallel, so one device that is off
+    // does not delay the others (and no new thread is created per message).
+    private val sender = Executors.newFixedThreadPool(4) { r ->
+        Thread(r, "clipsync-send").apply { isDaemon = true }
     }
 
     fun send(ctx: Context, text: String): Boolean {
@@ -243,8 +367,13 @@ object Net {
         }
         val id = myId(ctx)
         val name = myName()
-        thread {
-            for (p in peers) sendText(p, id, name, t)
+        for (p in peers) {
+            sender.execute {
+                try {
+                    sendText(p, id, name, t)
+                } catch (e: Exception) {
+                }
+            }
         }
         History.add(ctx, true, t, peers.joinToString(", ") { it.name })
         return true
