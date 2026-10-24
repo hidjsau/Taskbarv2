@@ -180,22 +180,51 @@ object TaskSource {
         return synchronized(this) { foreground.lastOrNull() }
     }
 
-    /** Entries for the Taskbar, newest first, or null to use Taskbar's normal list. */
+    // Stable (Windows style) order: apps keep the position they got when they were opened.
+    // Switching between apps never moves an icon; new apps join at the end.
+    private val openOrder = ArrayList<String>()
+    private val lastPresent = HashMap<String, Long>()
+    private const val GONE_GRACE_MS = 3000L
+
+    /**
+     * Entries for the Taskbar in opening order (first opened first), or null to use
+     * Taskbar's normal list. The caller assigns the sort times.
+     */
     @JvmStatic
     fun getOpenEntries(ctx: Context): List<AppEntry>? {
         if (!enabled(ctx)) return null
         val own = ctx.packageName
         val tasks = shizukuTasks(ctx)
+        // newest first
         val pkgs = if (tasks != null) {
             tasks.map { it.pkg }.filter { it != own }.distinct()
         } else {
             estimate(ctx)
         }
         val now = System.currentTimeMillis()
-        return pkgs.mapIndexed { i, p ->
-            val entry = AppEntry(p, null, null, null, false)
-            entry.setLastTimeUsed(now - i * 1000L) // keeps order, passes Taskbar's time filter
-            entry
+
+        val ordered: List<String> = synchronized(this) {
+            for (p in pkgs) lastPresent[p] = now
+
+            // forget apps that have really gone (short grace period avoids flicker
+            // when the data source briefly returns a different list)
+            val it = openOrder.iterator()
+            while (it.hasNext()) {
+                val p = it.next()
+                val seen = lastPresent[p] ?: 0L
+                if (!pkgs.contains(p) && now - seen > GONE_GRACE_MS) {
+                    it.remove()
+                    lastPresent.remove(p)
+                }
+            }
+
+            // new apps go to the end; if several are new at once, the oldest goes first
+            for (p in pkgs.asReversed()) {
+                if (!openOrder.contains(p)) openOrder.add(p)
+            }
+            ArrayList(openOrder)
         }
+
+        return ordered.map { p -> AppEntry(p, null, null, null, false) }
     }
 }

@@ -1727,7 +1727,19 @@ public class TaskbarController extends UIController {
 
     private List<AppEntry> getAppEntries() {
         List<AppEntry> openApps = com.clipsync.app.TaskSource.getOpenEntries(context);
-        if(openApps != null) return openApps;
+        if(openApps != null) {
+            // Keep the icons in a fixed (opening) order. Taskbar later sorts by "last used" and may
+            // reverse the list, so hand out descending times in the order it will start with.
+            boolean willReverse = needToReverseOrder(context, sortOrder)
+                    ^ TaskbarPosition.isVertical(context);
+            if(willReverse) Collections.reverse(openApps);
+
+            long now = System.currentTimeMillis();
+            for(int i = 0; i < openApps.size(); i++)
+                openApps.get(i).setLastTimeUsed(now - i * 1000L);
+
+            return openApps;
+        }
 
         SharedPreferences pref = U.getSharedPreferences(context);
         if(runningAppsOnly)
