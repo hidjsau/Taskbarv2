@@ -398,7 +398,7 @@ public class TaskbarController extends UIController {
             blurWindow = null;
         }
 
-        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && TaskbarBlurWindow.isSupported(context)) {
+        if(com.clipsync.app.BarTheme.usesBlur(context) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && TaskbarBlurWindow.isSupported(context)) {
             blurWindow = new TaskbarBlurWindow(context, layout, startButton, () -> {
                 // system blur switched on/off at runtime: refresh the bar tint (only while expanded)
                 if(layout != null && startButton != null && startButton.getVisibility() == View.VISIBLE)

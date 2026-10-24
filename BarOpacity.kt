@@ -27,19 +27,21 @@ object BarOpacity {
 
     @JvmStatic
     fun blurActive(ctx: Context): Boolean = try {
-        Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && TaskbarBlurWindow.isSupported(ctx)
+        BarTheme.usesBlur(ctx) && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
+            TaskbarBlurWindow.isSupported(ctx)
     } catch (t: Throwable) {
         false
     }
 
     @JvmStatic
-    fun defaultPercent(blurActive: Boolean): Int = if (blurActive) 40 else 70
+    fun defaultPercent(ctx: Context, blurActive: Boolean): Int =
+        if (blurActive) 40 else if (BarTheme.usesBlur(ctx)) 70 else 85
 
     /** Chosen percent, or the default for the current mode when nothing was chosen. */
     @JvmStatic
     fun percent(ctx: Context, blurActive: Boolean): Int {
         val v = U.getSharedPreferences(ctx).getInt(PREF, -1)
-        return if (v in 0..100) v else defaultPercent(blurActive)
+        return if (v in 0..100) v else defaultPercent(ctx, blurActive)
     }
 
     /** Alpha (0-255) for the inner, lighter edge of the gradient. */
@@ -58,7 +60,7 @@ object BarOpacity {
     @JvmStatic
     fun summary(ctx: Context): String {
         val v = U.getSharedPreferences(ctx).getInt(PREF, -1)
-        return if (v in 0..100) "$v%" else "Default (${defaultPercent(blurActive(ctx))}%)"
+        return if (v in 0..100) "$v%" else "Default (${defaultPercent(ctx, blurActive(ctx))}%)"
     }
 
     /** Slider dialog. [onChanged] runs after the value was saved (to refresh the summary). */

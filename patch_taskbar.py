@@ -261,6 +261,46 @@ if "clipsync_bar_opacity" not in afr:
     )
     write(AFR, afr)
 print("opacity slider ok")
+# 3e. Taskbar theme picker (Appearance settings) -----------------------------
+ap = read(AP)
+if "clipsync_bar_theme" not in ap:
+    ap = once(
+        ap,
+        r'(\n[ \t]*<Preference\s+android:key="clipsync_bar_opacity")',
+        lambda x: """
+    <Preference
+        android:key="clipsync_bar_theme"
+        android:title="Taskbar theme"
+        android:summary="Choose a look for the taskbar" />
+""" + x.group(1),
+        "theme pref",
+    )
+    write(AP, ap)
+
+afr = read(AFR)
+if "clipsync_bar_theme" not in afr:
+    afr = once(
+        afr,
+        r'(findPreference\("clipsync_bar_opacity"\)\.setOnPreferenceClickListener\(this\);)',
+        r'''findPreference("clipsync_bar_theme").setOnPreferenceClickListener(this);
+        findPreference("clipsync_bar_theme").setSummary(com.clipsync.app.BarTheme.summary(getActivity()));
+        \1''',
+        "theme listener",
+    )
+    afr = once(
+        afr,
+        r'(            case "clipsync_bar_opacity":\n)',
+        r'''            case "clipsync_bar_theme":
+                com.clipsync.app.BarTheme.showDialog(getActivity(), () -> {
+                    p.setSummary(com.clipsync.app.BarTheme.summary(getActivity()));
+                    findPreference("clipsync_bar_opacity").setSummary(com.clipsync.app.BarOpacity.summary(getActivity()));
+                });
+                break;
+\1''',
+        "theme click",
+    )
+    write(AFR, afr)
+print("theme picker ok")
 
 print("home page entry ok")
 

@@ -933,8 +933,11 @@ public class U {
         }
 
         // When the frosted-glass blur window is active the tint is lighter, so the blur shows through
-        boolean blurActive = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                && com.farmerbb.taskbar.ui.TaskbarBlurWindow.isSupported(context);
+        // Any theme other than the original Glass look is drawn by the app itself (no blur window)
+        if(com.clipsync.app.BarTheme.apply(context, view, tint))
+            return;
+
+        boolean blurActive = com.clipsync.app.BarOpacity.blurActive(context);
 
         int base = androidx.core.graphics.ColorUtils.blendARGB(tint | 0xFF000000, Color.WHITE, 0.12f);
         int inner = androidx.core.graphics.ColorUtils.setAlphaComponent(
