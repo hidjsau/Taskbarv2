@@ -36,4 +36,29 @@
     <dimen name="tb_drawer_edge_gap">12dp</dimen>
     <dimen name="tb_drawer_search_height">52dp</dimen>
     <dimen name="tb_drawer_elevation">6dp</dimen>
+
+    <!-- User-controlled drawer background opacity (Settings > Appearance) -->
+    <string name="tb_pref_title_drawer_opacity" translatable="false">App drawer opacity</string>
+    <string-array name="tb_drawer_opacity_entries" translatable="false">
+        <item>100% (solid)</item>
+        <item>90%</item>
+        <item>80%</item>
+        <item>70%</item>
+        <item>60%</item>
+        <item>50%</item>
+        <item>40%</item>
+        <item>30%</item>
+        <item>20%</item>
+    </string-array>
+    <string-array name="tb_drawer_opacity_values" translatable="false">
+        <item>100</item>
+        <item>90</item>
+        <item>80</item>
+        <item>70</item>
+        <item>60</item>
+        <item>50</item>
+        <item>40</item>
+        <item>30</item>
+        <item>20</item>
+    </string-array>
 </resources>
