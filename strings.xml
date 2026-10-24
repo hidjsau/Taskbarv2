@@ -508,4 +508,6 @@
     <string name="tb_pill_show_taskbar">Show taskbar</string>
     <string name="tb_pill_hide_taskbar">Hide taskbar</string>
 
+    <string name="tb_drawer_more_options">More options</string>
+
 </resources>

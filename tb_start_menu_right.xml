@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright 2016 Braden Farmer
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<com.farmerbb.taskbar.widget.StartMenuLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/start_menu_layout"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:clickable="true"
+    android:visibility="gone">
+
+        <FrameLayout
+            android:id="@+id/start_menu_frame"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:padding="@dimen/tb_drawer_card_padding"
+            android:background="@drawable/tb_drawer_card_bg"
+            android:clipToOutline="true" >
+
+                <GridView
+                    android:id="@+id/start_menu"
+                    android:layout_width="@dimen/tb_start_menu_width"
+                    android:layout_height="@dimen/tb_start_menu_height"
+                    android:background="@null"
+                    android:listSelector="@null"
+                    android:clickable="false" />
+
+                <TextView
+                    android:id="@+id/no_apps_found"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:gravity="center"
+                    android:textSize="14sp"
+                    android:textColor="?tb_drawer_on_surface_variant"
+                    android:text="@string/tb_loading_apps" />
+
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/search_view_layout"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:paddingLeft="@dimen/tb_drawer_card_padding"
+            android:paddingTop="@dimen/tb_drawer_gap"
+            android:paddingRight="@dimen/tb_drawer_card_padding" >
+
+                <LinearLayout
+                    android:id="@+id/search_view_child_layout"
+                    android:layout_width="@dimen/tb_start_menu_width"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/tb_drawer_search_bg"
+                    android:paddingRight="4dp"
+                    android:gravity="center_vertical" >
+
+                        <androidx.appcompat.widget.SearchView
+                            android:id="@+id/search"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            app:queryBackground="@android:color/transparent"
+                            app:iconifiedByDefault="false" />
+
+                        <LinearLayout
+                            android:id="@+id/power_button"
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:clickable="true"
+                            android:background="@drawable/tb_drawer_icon_button_bg"
+                            android:contentDescription="@string/tb_drawer_more_options" >
+
+                                <ImageView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_gravity="center"
+                                    android:src="@drawable/tb_more_vert"
+                                    android:tint="?tb_drawer_on_surface_variant" />
+
+                        </LinearLayout>
+
+                </LinearLayout>
+
+        </FrameLayout>
+
+        <Space
+            android:id="@+id/start_menu_space"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/tb_icon_size" />
+
+</com.farmerbb.taskbar.widget.StartMenuLayout>

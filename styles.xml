@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Copyright 2016 Braden Farmer
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+
+<resources>
+
+    <style name="TaskbarBase" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="colorPrimary">@color/tb_colorPrimary</item>
+        <item name="colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="colorAccent">@color/tb_colorAccent</item>
+        <item name="tb_start_menu_background">@color/tb_start_menu_background</item>
+        <item name="tb_text_color">@color/tb_text_color</item>
+        <item name="tb_drawer_container">@color/tb_drawer_container_light</item>
+        <item name="tb_drawer_search">@color/tb_drawer_search_light</item>
+        <item name="tb_drawer_outline">@color/tb_drawer_outline_light</item>
+        <item name="tb_drawer_on_surface">@color/tb_drawer_on_surface_light</item>
+        <item name="tb_drawer_on_surface_variant">@color/tb_drawer_on_surface_variant_light</item>
+        <item name="tb_drawer_state_layer">@color/tb_drawer_state_layer_light</item>
+        <item name="tb_drawer_hover">@color/tb_drawer_hover_light</item>
+        <item name="tb_main_activity_background">@color/tb_main_activity_background</item>
+        <item name="tb_settings_icon_color">@color/tb_settings_icon_color</item>
+    </style>
+
+    <style name="TaskbarBase.Dark" parent="Theme.AppCompat.NoActionBar">
+        <item name="colorPrimary">@color/tb_colorPrimary</item>
+        <item name="colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="colorAccent">@color/tb_colorAccent</item>
+        <item name="tb_start_menu_background">@color/tb_start_menu_background_dark</item>
+        <item name="tb_text_color">@color/tb_text_color_dark</item>
+        <item name="tb_drawer_container">@color/tb_drawer_container_dark</item>
+        <item name="tb_drawer_search">@color/tb_drawer_search_dark</item>
+        <item name="tb_drawer_outline">@color/tb_drawer_outline_dark</item>
+        <item name="tb_drawer_on_surface">@color/tb_drawer_on_surface_dark</item>
+        <item name="tb_drawer_on_surface_variant">@color/tb_drawer_on_surface_variant_dark</item>
+        <item name="tb_drawer_state_layer">@color/tb_drawer_state_layer_dark</item>
+        <item name="tb_drawer_hover">@color/tb_drawer_hover_dark</item>
+        <item name="tb_main_activity_background">@color/tb_main_activity_background_dark</item>
+        <item name="tb_settings_icon_color">@color/tb_settings_icon_color_dark</item>
+    </style>
+
+    <style name="Taskbar" parent="TaskbarBase" />
+
+    <style name="Taskbar.Dark" parent="TaskbarBase.Dark" />
+
+    <style name="Taskbar.Floating">
+        <item name="android:windowIsFloating">true</item>
+    </style>
+
+    <style name="Taskbar.Dark.Floating">
+        <item name="android:windowIsFloating">true</item>
+    </style>
+
+    <style name="Taskbar.HomeActivity" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowShowWallpaper">true</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <style name="Taskbar.InvisibleActivity" parent="@android:style/Theme.Material.Dialog.NoActionBar">
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
+    <style name="Taskbar.Dialog" parent="@android:style/Theme.Material.Light.Dialog">
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="Taskbar.Dialog.Dark" parent="@android:style/Theme.Material.Dialog">
+        <item name="android:windowNoTitle">true</item>
+    </style>
+
+    <style name="Taskbar.Dialog.Blacklist" parent="Theme.AppCompat.Light.Dialog">
+        <item name="colorPrimary">@color/tb_colorPrimary</item>
+        <item name="colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="colorAccent">@color/tb_colorAccent</item>
+    </style>
+
+    <style name="Taskbar.Dialog.Blacklist.Dark" parent="Theme.AppCompat.Dialog">
+        <item name="colorPrimary">@color/tb_colorPrimary</item>
+        <item name="colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="colorAccent">@color/tb_colorAccent</item>
+    </style>
+
+    <style name="Taskbar.Incognito" parent="@android:style/Theme.Material.Light">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimAmount">0</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="Taskbar.Incognito.Dark" parent="@android:style/Theme.Material">
+        <item name="android:windowIsFloating">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimAmount">0</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+    </style>
+
+    <style name="Taskbar.Dialog.Preference" parent="@android:style/Theme.Material.Light.Dialog">
+        <item name="android:colorPrimary">@color/tb_colorPrimary</item>
+        <item name="android:colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="android:colorAccent">@color/tb_colorAccent</item>
+    </style>
+
+    <style name="Taskbar.Dialog.Preference.Dark" parent="@android:style/Theme.Material.Dialog">
+        <item name="android:colorPrimary">@color/tb_colorPrimary</item>
+        <item name="android:colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="android:colorAccent">@color/tb_colorAccent</item>
+    </style>
+
+    <style name="Taskbar.DimScreenActivity" parent="Theme.AppCompat">
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="tb_settings_icon_color">@color/tb_settings_icon_color_dark</item>
+    </style>
+
+    <style name="Taskbar.Dialog.FullWidth" parent="Theme.AppCompat.Light.Dialog">
+        <item name="colorPrimary">@color/tb_colorPrimary</item>
+        <item name="colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="colorAccent">@color/tb_colorAccent</item>
+        <item name="android:textColor">@android:color/black</item>
+        <item name="android:windowMinWidthMajor">95%</item>
+        <item name="android:windowMinWidthMinor">95%</item>
+    </style>
+
+    <style name="Taskbar.Dialog.FullWidth.Dark" parent="Theme.AppCompat.Dialog">
+        <item name="colorPrimary">@color/tb_colorPrimary</item>
+        <item name="colorPrimaryDark">@color/tb_colorPrimaryDark</item>
+        <item name="colorAccent">@color/tb_colorAccent</item>
+        <item name="android:textColor">@android:color/white</item>
+        <item name="android:windowMinWidthMajor">95%</item>
+        <item name="android:windowMinWidthMinor">95%</item>
+    </style>
+
+</resources>

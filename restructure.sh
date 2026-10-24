@@ -24,6 +24,24 @@ move Constants.java         app/src/main/java/com/farmerbb/taskbar/util
 move ContextMenuActivity.java app/src/main/java/com/farmerbb/taskbar/activity
 move tb_pref_context_menu_launch_options.xml app/src/main/res/xml
 
+# App drawer redesign
+move tb_drawer_values.xml        app/src/main/res/values
+move styles.xml                  app/src/main/res/values
+move tb_drawer_card_bg.xml       app/src/main/res/drawable
+move tb_drawer_search_bg.xml     app/src/main/res/drawable
+move tb_drawer_item_bg.xml       app/src/main/res/drawable
+move tb_drawer_icon_button_bg.xml app/src/main/res/drawable
+move tb_drawer_item_grid.xml     app/src/main/res/layout
+move tb_drawer_item_list.xml     app/src/main/res/layout
+move tb_start_menu_left.xml          app/src/main/res/layout
+move tb_start_menu_right.xml         app/src/main/res/layout
+move tb_start_menu_top_left.xml      app/src/main/res/layout
+move tb_start_menu_top_right.xml     app/src/main/res/layout
+move tb_start_menu_vertical_left.xml  app/src/main/res/layout
+move tb_start_menu_vertical_right.xml app/src/main/res/layout
+move StartMenuController.java app/src/main/java/com/farmerbb/taskbar/ui
+move StartMenuAdapter.java    app/src/main/java/com/farmerbb/taskbar/adapter
+
 # "Close app" fallback needs this permission (idempotent)
 MF=app/src/playstore/AndroidManifest.xml
 if [ -f "$MF" ] && ! grep -q KILL_BACKGROUND_PROCESSES "$MF"; then

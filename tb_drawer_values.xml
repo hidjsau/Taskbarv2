@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App drawer (start menu) design tokens. Light/dark values are attached in styles.xml. -->
+<resources>
+
+    <attr name="tb_drawer_container" format="reference|color" />
+    <attr name="tb_drawer_search" format="reference|color" />
+    <attr name="tb_drawer_outline" format="reference|color" />
+    <attr name="tb_drawer_on_surface" format="reference|color" />
+    <attr name="tb_drawer_on_surface_variant" format="reference|color" />
+    <attr name="tb_drawer_state_layer" format="reference|color" />
+    <attr name="tb_drawer_hover" format="reference|color" />
+
+    <color name="tb_drawer_container_light">#F3EDF7</color>
+    <color name="tb_drawer_search_light">#E6E0E9</color>
+    <color name="tb_drawer_outline_light">#CAC4D0</color>
+    <color name="tb_drawer_on_surface_light">#1D1B20</color>
+    <color name="tb_drawer_on_surface_variant_light">#49454F</color>
+    <color name="tb_drawer_state_layer_light">#291D1B20</color>
+    <color name="tb_drawer_hover_light">#141D1B20</color>
+
+    <color name="tb_drawer_container_dark">#211F26</color>
+    <color name="tb_drawer_search_dark">#2B2930</color>
+    <color name="tb_drawer_outline_dark">#49454F</color>
+    <color name="tb_drawer_on_surface_dark">#E6E0E9</color>
+    <color name="tb_drawer_on_surface_variant_dark">#CAC4D0</color>
+    <color name="tb_drawer_state_layer_dark">#29E6E0E9</color>
+    <color name="tb_drawer_hover_dark">#14E6E0E9</color>
+
+    <dimen name="tb_drawer_card_radius">24dp</dimen>
+    <dimen name="tb_drawer_card_padding">8dp</dimen>
+    <dimen name="tb_drawer_search_radius">28dp</dimen>
+    <dimen name="tb_drawer_gap">8dp</dimen>
+    <dimen name="tb_drawer_item_radius">16dp</dimen>
+    <dimen name="tb_drawer_item_inset">2dp</dimen>
+
+</resources>
