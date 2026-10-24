@@ -132,7 +132,7 @@ public class TaskbarController extends UIController {
     private boolean shouldRefreshRecents = true;
     private boolean taskbarShownTemporarily = false;
     private boolean taskbarHiddenTemporarily = false;
-    private boolean isRefreshingRecents = false;
+    private volatile boolean isRefreshingRecents = false;
     private boolean isFirstStart = true;
     private TaskbarBlurWindow blurWindow;
 
@@ -763,13 +763,20 @@ public class TaskbarController extends UIController {
 
         handler = U.newHandler();
         thread = new Thread(() -> {
-            updateRecentApps(true);
+            try {
+                updateRecentApps(true);
+            } catch(Throwable ignored) {}
 
             if(!isRefreshingRecents) {
                 isRefreshingRecents = true;
 
+                try {
                 while(shouldRefreshRecents) {
-                    updateRecentApps(false);
+                    try {
+                        updateRecentApps(false);
+                    } catch(Throwable ignored) {
+                        // one bad refresh must not kill the loop
+                    }
 
                     if(showHideAutomagically && !positionIsVertical && !MenuHelper.getInstance().isStartMenuOpen()) {
                         handler.post(() -> {
@@ -795,8 +802,10 @@ public class TaskbarController extends UIController {
 
                     SystemClock.sleep(refreshInterval);
                 }
-
-                isRefreshingRecents = false;
+                } finally {
+                    // always reset, otherwise the list never refreshes again
+                    isRefreshingRecents = false;
+                }
             }
         });
 
