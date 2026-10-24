@@ -923,7 +923,7 @@ public class U {
 
     /**
      * Glass-style bar background: a soft translucent light-to-dark gradient with no outline.
-     * (No window blur: blurring behind an overlay window affected the whole screen.)
+     * On Android 12+ a separate taskbar-sized blur window (TaskbarBlurWindow) sits behind it.
      * A fully transparent background tint is respected and left alone.
      */
     public static void applyGlassBackground(Context context, View view, int tint) {
@@ -932,10 +932,14 @@ public class U {
             return;
         }
 
+        // When the frosted-glass blur window is active the tint is lighter, so the blur shows through
+        boolean blurActive = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && com.farmerbb.taskbar.ui.TaskbarBlurWindow.isSupported(context);
+
         int base = androidx.core.graphics.ColorUtils.blendARGB(tint | 0xFF000000, Color.WHITE, 0.12f);
         int inner = androidx.core.graphics.ColorUtils.setAlphaComponent(
-                androidx.core.graphics.ColorUtils.blendARGB(base, Color.WHITE, 0.10f), 0xB4);
-        int outer = androidx.core.graphics.ColorUtils.setAlphaComponent(base, 0x96);
+                androidx.core.graphics.ColorUtils.blendARGB(base, Color.WHITE, 0.10f), blurActive ? 0x66 : 0xB4);
+        int outer = androidx.core.graphics.ColorUtils.setAlphaComponent(base, blurActive ? 0x52 : 0x96);
 
         // The lighter side of the gradient faces into the screen
         android.graphics.drawable.GradientDrawable.Orientation orientation;

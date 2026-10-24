@@ -134,6 +134,7 @@ public class TaskbarController extends UIController {
     private boolean taskbarHiddenTemporarily = false;
     private boolean isRefreshingRecents = false;
     private boolean isFirstStart = true;
+    private TaskbarBlurWindow blurWindow;
 
     private boolean startThread2 = false;
     private boolean stopThread2 = false;
@@ -390,6 +391,21 @@ public class TaskbarController extends UIController {
         };
 
         startRefreshingRecents();
+
+        // Frosted-glass backdrop: must be registered BEFORE the taskbar window so it sits below it
+        if(blurWindow != null) {
+            blurWindow.detach();
+            blurWindow = null;
+        }
+
+        if(Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && TaskbarBlurWindow.isSupported(context)) {
+            blurWindow = new TaskbarBlurWindow(context, layout, startButton, () -> {
+                // system blur switched on/off at runtime: refresh the bar tint (only while expanded)
+                if(layout != null && startButton != null && startButton.getVisibility() == View.VISIBLE)
+                    U.applyGlassBackground(context, layout, U.getBackgroundTint(context));
+            });
+            blurWindow.attach();
+        }
 
         host.addView(layout, params);
 
@@ -1498,6 +1514,11 @@ public class TaskbarController extends UIController {
     public void onDestroyHost(UIHost host) {
         shouldRefreshRecents = false;
 
+        if(blurWindow != null) {
+            blurWindow.detach();
+            blurWindow = null;
+        }
+
         if(layout != null)
             try {
                 host.removeView(layout);
@@ -1553,6 +1574,11 @@ public class TaskbarController extends UIController {
             try {
                 host.removeView(layout);
             } catch (IllegalArgumentException ignored) {}
+
+            if(blurWindow != null) {
+                blurWindow.detach();
+                blurWindow = null;
+            }
 
             currentTaskbarPosition = 0;
 
