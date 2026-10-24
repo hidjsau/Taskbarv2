@@ -129,10 +129,23 @@ public class TaskbarController extends UIController {
     private Thread thread2;
 
     private boolean isShowingRecents = true;
-    private boolean shouldRefreshRecents = true;
+    private volatile boolean shouldRefreshRecents = true;
     private boolean taskbarShownTemporarily = false;
     private boolean taskbarHiddenTemporarily = false;
-    private volatile boolean isRefreshingRecents = false;
+    // Each call to startRefreshingRecents() gets a new generation number. An older refresh loop
+    // sees that its number is out of date and ends by itself, so there is only ever one loop.
+    private final java.util.concurrent.atomic.AtomicInteger refreshGeneration =
+            new java.util.concurrent.atomic.AtomicInteger();
+    // Only one refresh runs at a time (the first refresh of a new loop waits for an old one to finish)
+    private final Object refreshLock = new Object();
+
+    // Shortcut for "nothing changed": the list of open apps from the last full build.
+    // While the new list matches it, the expensive per-app lookups are skipped.
+    private static final long FULL_REBUILD_MS = 30_000L;
+    private volatile String lastListSignature = null;
+    private volatile List<AppEntry> lastEntries = null;
+    private volatile long lastFullBuild = 0L;
+    private volatile boolean openAppsMode = false;
     private boolean isFirstStart = true;
     private TaskbarBlurWindow blurWindow;
 
@@ -758,6 +771,8 @@ public class TaskbarController extends UIController {
     }
 
     private void startRefreshingRecents() {
+        // Older loops notice the new generation and stop. The interrupt wakes one that is sleeping.
+        final int generation = refreshGeneration.incrementAndGet();
         if(thread != null) thread.interrupt();
         stopThread2 = true;
 
@@ -765,56 +780,97 @@ public class TaskbarController extends UIController {
         showHideAutomagically = pref.getBoolean(PREF_HIDE_WHEN_KEYBOARD_SHOWN, false);
 
         currentTaskbarIds.clear();
+        lastListSignature = null;
 
         handler = U.newHandler();
         thread = new Thread(() -> {
-            try {
-                updateRecentApps(true);
-            } catch(Throwable ignored) {}
+            refreshOnce(true);
 
-            if(!isRefreshingRecents) {
-                isRefreshingRecents = true;
+            while(shouldRefreshRecents && generation == refreshGeneration.get()) {
+                refreshOnce(false);
 
-                try {
-                while(shouldRefreshRecents) {
-                    try {
-                        updateRecentApps(false);
-                    } catch(Throwable ignored) {
-                        // one bad refresh must not kill the loop
-                    }
+                if(showHideAutomagically && !positionIsVertical && !MenuHelper.getInstance().isStartMenuOpen()) {
+                    handler.post(() -> {
+                        if(layout != null) {
+                            int[] location = new int[2];
+                            layout.getLocationOnScreen(location);
 
-                    if(showHideAutomagically && !positionIsVertical && !MenuHelper.getInstance().isStartMenuOpen()) {
-                        handler.post(() -> {
-                            if(layout != null) {
-                                int[] location = new int[2];
-                                layout.getLocationOnScreen(location);
-
-                                if(location[1] != 0) {
-                                    if(location[1] > currentTaskbarPosition) {
+                            if(location[1] != 0) {
+                                if(location[1] > currentTaskbarPosition) {
+                                    currentTaskbarPosition = location[1];
+                                } else if(location[1] < currentTaskbarPosition) {
+                                    if(currentTaskbarPosition - location[1] == getNavBarSize())
                                         currentTaskbarPosition = location[1];
-                                    } else if(location[1] < currentTaskbarPosition) {
-                                        if(currentTaskbarPosition - location[1] == getNavBarSize())
-                                            currentTaskbarPosition = location[1];
-                                        else if(!startThread2) {
-                                            startThread2 = true;
-                                            tempHideTaskbar(true);
-                                        }
+                                    else if(!startThread2) {
+                                        startThread2 = true;
+                                        tempHideTaskbar(true);
                                     }
                                 }
                             }
-                        });
-                    }
-
-                    SystemClock.sleep(refreshInterval);
+                        }
+                    });
                 }
-                } finally {
-                    // always reset, otherwise the list never refreshes again
-                    isRefreshingRecents = false;
+
+                try {
+                    Thread.sleep(refreshInterval);
+                } catch(InterruptedException e) {
+                    // Woken up to stop or restart. The loop condition above decides what happens next.
                 }
             }
         });
 
         thread.start();
+    }
+
+    /** One refresh, never two at the same time. One bad refresh must not kill the loop. */
+    private void refreshOnce(boolean firstRefresh) {
+        synchronized(refreshLock) {
+            try {
+                updateRecentApps(firstRefresh);
+            } catch(Throwable ignored) {}
+        }
+    }
+
+    /** Number of system tray icons that are on right now. */
+    private int countSysTrayIcons() {
+        int count = 0;
+        for(Integer key : sysTrayIconStates.keySet()) {
+            Boolean on = sysTrayIconStates.get(key);
+            if(on != null && on) count++;
+        }
+
+        return count;
+    }
+
+    /**
+     * Cheap fingerprint of everything that decides what the taskbar shows: the open apps (in
+     * order), the pinned and blocked apps, the size limit and the tray icon count.
+     */
+    private String buildListSignature(List<AppEntry> list,
+                                      List<AppEntry> pinnedApps,
+                                      List<AppEntry> blockedApps,
+                                      int maxNumOfEntries) {
+        StringBuilder sb = new StringBuilder(160);
+        sb.append(maxNumOfEntries).append('#').append(countSysTrayIcons()).append('#');
+
+        for(AppEntry entry : list)
+            sb.append(entry.getPackageName()).append(',');
+
+        sb.append('#');
+        //noinspection SynchronizationOnLocalVariableOrMethodParameter
+        synchronized(pinnedApps) {
+            for(AppEntry entry : pinnedApps)
+                sb.append(entry.getPackageName()).append(':').append(entry.getComponentName()).append(',');
+        }
+
+        sb.append('#');
+        //noinspection SynchronizationOnLocalVariableOrMethodParameter
+        synchronized(blockedApps) {
+            for(AppEntry entry : blockedApps)
+                sb.append(entry.getPackageName()).append(',');
+        }
+
+        return sb.toString();
     }
 
     @SuppressWarnings("Convert2streamapi")
@@ -836,6 +892,33 @@ public class TaskbarController extends UIController {
         List<AppEntry> blockedApps = pba.getBlockedApps();
         List<String> applicationIdsToRemove = new ArrayList<>();
 
+        if(firstRefresh) lastListSignature = null;
+
+        // Shortcut: get the open apps first (cheap, comes from a cache). If they, the pinned apps
+        // and the other inputs are the same as in the last full build, nothing needs rebuilding:
+        // skip the per-app lookups and only refresh the running/focused indicators.
+        List<AppEntry> earlyList = null;
+        String signature = null;
+        if(!firstRefresh && pinnedApps.size() < maxNumOfEntries) {
+            earlyList = getAppEntries();
+
+            if(openAppsMode) {
+                signature = buildListSignature(earlyList, pinnedApps, blockedApps, maxNumOfEntries);
+                List<AppEntry> shown = lastEntries;
+
+                if(shown != null
+                        && signature.equals(lastListSignature)
+                        && SystemClock.elapsedRealtime() - lastFullBuild < FULL_REBUILD_MS) {
+                    if(runningAppsOnly) {
+                        final List<AppEntry> running = earlyList;
+                        handler.post(() -> updateRunningAppIndicators(pinnedApps, running, shown));
+                    }
+
+                    return;
+                }
+            }
+        }
+
         // Filter out anything on the pinned/blocked apps lists
         int realNumOfPinnedApps = filterRealPinnedApps(context, pinnedApps, entries, applicationIdsToRemove);
 
@@ -849,7 +932,9 @@ public class TaskbarController extends UIController {
         }
 
         // Get list of all recently used apps
-        List<AppEntry> usageStatsList = realNumOfPinnedApps < maxNumOfEntries ? getAppEntries() : new ArrayList<>();
+        List<AppEntry> usageStatsList = realNumOfPinnedApps < maxNumOfEntries
+                ? (earlyList != null ? earlyList : getAppEntries())
+                : new ArrayList<>();
         if(usageStatsList.size() > 0 || realNumOfPinnedApps > 0 || fullLength) {
             if(realNumOfPinnedApps < maxNumOfEntries) {
                 List<AppEntry> usageStatsList2 = new ArrayList<>();
@@ -1019,6 +1104,13 @@ public class TaskbarController extends UIController {
                 });
             } else if(runningAppsOnly)
                 handler.post(() -> updateRunningAppIndicators(pinnedApps, usageStatsList, entries));
+
+            // Remember this build, so the next refresh can take the shortcut if nothing changed
+            if(signature != null && openAppsMode) {
+                lastEntries = entries;
+                lastListSignature = signature;
+                lastFullBuild = SystemClock.elapsedRealtime();
+            }
         } else if(firstRefresh || currentTaskbarIds.size() > 0) {
             currentTaskbarIds.clear();
             handler.post(() -> {
@@ -1769,6 +1861,7 @@ public class TaskbarController extends UIController {
 
     private List<AppEntry> getAppEntries() {
         List<AppEntry> openApps = com.clipsync.app.TaskSource.getOpenEntries(context);
+        openAppsMode = openApps != null;
         if(openApps != null) {
             // Keep the icons in a fixed (opening) order. Taskbar later sorts by "last used" and may
             // reverse the list, so hand out descending times in the order it will start with.

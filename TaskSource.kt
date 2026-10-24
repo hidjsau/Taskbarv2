@@ -2,14 +2,22 @@ package com.clipsync.app
 
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.os.Build
+import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import com.farmerbb.taskbar.util.AppEntry
 import com.farmerbb.taskbar.util.U
 import rikka.shizuku.Shizuku
+import rikka.shizuku.ShizukuBinderWrapper
+import rikka.shizuku.SystemServiceHelper
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.util.concurrent.Callable
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
@@ -76,7 +84,7 @@ object TaskSource {
 
     // ---- shell call: bounded, always cleaned up --------------------------------------
     private const val SHELL_TIMEOUT_MS = 4000L
-    private const val STALE_OK_MS = 10_000L
+    private const val MAX_STALE_MS = 30_000L
 
     private val shellExec: ExecutorService = Executors.newSingleThreadExecutor { r ->
         Thread(r, "taskbar-shell").apply { isDaemon = true }
@@ -169,24 +177,170 @@ object TaskSource {
         return tasks
     }
 
-    /** Real task list from Shizuku, newest first; null when Shizuku can't be used. */
+    // ---- Direct binder call (fast path) ----------------------------------------------
+    // Asks the system's activity task service for the recent tasks through Shizuku. No process
+    // is started and nothing is parsed, so it takes a few milliseconds instead of a few hundred.
+    // Any problem (other Android version, hidden API change, Shizuku restart) makes it return
+    // null, and the caller falls back to the dumpsys shell command below.
+
+    private const val RECENT_IGNORE_UNAVAILABLE = 0x2
+    private const val BINDER_MAX_TASKS = 50
+    private const val BINDER_FAIL_LIMIT = 3
+    private const val BINDER_RETRY_MS = 60_000L
+
+    private var binderService: Any? = null
+    private var binderMethod: Method? = null
+    private var binderFails = 0
+    private var binderRetryAt = 0L
+    private val fieldCache = ConcurrentHashMap<String, Field>()
+    private val missingFields = ConcurrentHashMap<String, Boolean>()
+
+    private fun resetBinder() {
+        binderService = null
+        binderMethod = null
+    }
+
+    private fun initBinder(): Boolean {
+        U.allowReflection()
+        val modern = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        val serviceName = if (modern) "activity_task" else "activity"
+        val ifaceName = if (modern) "android.app.IActivityTaskManager" else "android.app.IActivityManager"
+
+        val raw = SystemServiceHelper.getSystemService(serviceName) ?: return false
+        val wrapped = ShizukuBinderWrapper(raw)
+        val stub = Class.forName("$ifaceName\$Stub")
+        val service = stub.getMethod("asInterface", IBinder::class.java).invoke(null, wrapped)
+            ?: return false
+
+        val method = Class.forName(ifaceName).methods.firstOrNull { m ->
+            m.name == "getRecentTasks" &&
+                m.parameterTypes.size == 3 &&
+                m.parameterTypes.all { it == Int::class.javaPrimitiveType }
+        } ?: return false
+
+        binderService = service
+        binderMethod = method
+        return true
+    }
+
+    /** Reads a (possibly hidden) field of RecentTaskInfo; null when it does not exist. */
+    private fun field(info: Any, name: String): Any? {
+        if (missingFields.containsKey(name)) return null
+        return try {
+            val f = fieldCache.getOrPut(name) { info.javaClass.getField(name) }
+            f.get(info)
+        } catch (e: NoSuchFieldException) {
+            missingFields[name] = true
+            null
+        } catch (e: Throwable) {
+            null
+        }
+    }
+
+    private fun packageOf(info: Any): String? {
+        for (n in arrayOf("baseActivity", "realActivity", "origActivity", "topActivity")) {
+            val comp = field(info, n) as? ComponentName
+            if (comp != null) return comp.packageName
+        }
+        val intent = field(info, "baseIntent") as? Intent
+        val fromIntent = intent?.component?.packageName
+        if (fromIntent != null) return fromIntent
+        // last resort, same idea as the "A=" part of the dumpsys line: "<userId>:<package>"
+        val affinity = field(info, "affinity") as? String
+        if (affinity != null) {
+            val p = affinity.substringAfter(':')
+            if (p.isNotEmpty()) return p
+        }
+        return null
+    }
+
+    private fun fetchViaBinder(): List<Task>? {
+        val now = SystemClock.elapsedRealtime()
+        if (now < binderRetryAt) return null
+        try {
+            if (binderMethod == null && !initBinder()) throw IllegalStateException("binder init")
+            val slice = binderMethod!!.invoke(
+                binderService, BINDER_MAX_TASKS, RECENT_IGNORE_UNAVAILABLE, 0
+            ) ?: throw IllegalStateException("no result")
+            val list = slice.javaClass.getMethod("getList").invoke(slice) as List<*>
+
+            val tasks = ArrayList<Task>(list.size)
+            for (info in list) {
+                if (info == null) continue
+                // other users (work profile etc.) are not shown, same as before
+                val user = field(info, "userId") as? Int
+                if (user != null && user != 0) continue
+                val pkg = packageOf(info) ?: continue
+                val visible = (field(info, "isVisible") as? Boolean) ?: false
+                tasks.add(Task(pkg, visible, ""))
+            }
+            binderFails = 0
+            return tasks
+        } catch (t: Throwable) {
+            // forget the connection (Shizuku may have restarted); after a few failures in a
+            // row stop trying for a minute and use the shell command instead
+            resetBinder()
+            binderFails++
+            if (binderFails >= BINDER_FAIL_LIMIT) {
+                binderFails = 0
+                binderRetryAt = now + BINDER_RETRY_MS
+            }
+            return null
+        }
+    }
+
+    private fun fetchViaShell(): List<Task>? {
+        val out = run(arrayOf("sh", "-c", "dumpsys activity recents 2>/dev/null"))
+        if (out.isNullOrBlank()) return null
+        return parseRecents(out)
+    }
+
+    private const val SRC_BINDER = 1
+    private const val SRC_SHELL = 2
+    private const val BINDER_CACHE_MS = 300L
+    private const val SHELL_CACHE_MS = 1000L
+    @Volatile private var lastSource = SRC_SHELL
+    private val fetchLock = Any()
+
+    /**
+     * Real task list from Shizuku, newest first; null when Shizuku can't be used.
+     * A failed, timed-out or busy refresh keeps returning the last good list (for up to
+     * MAX_STALE_MS), so the taskbar never goes blank just because one refresh was slow.
+     */
     @JvmStatic
     fun shizukuTasks(ctx: Context): List<Task>? {
         if (shizukuStateCached() != 2) return null
+        // never block the UI thread: it only ever gets the last result
+        if (onMain()) return cache
+
         val now = SystemClock.elapsedRealtime()
         val c = cache
-        if (c != null && now - cacheTime < 1000L) return c
-        // never block the UI thread on a shell call
-        if (onMain()) return c
-        val out = run(arrayOf("sh", "-c", "dumpsys activity recents 2>/dev/null"))
-        if (out.isNullOrBlank()) {
-            // shell failed or timed out: keep showing the last good list for a short while
-            return if (c != null && now - cacheTime < STALE_OK_MS) c else null
+        val ttl = if (lastSource == SRC_BINDER) BINDER_CACHE_MS else SHELL_CACHE_MS
+        if (c != null && now - cacheTime < ttl) return c
+
+        return synchronized(fetchLock) {
+            // another thread may have refreshed while we waited for the lock
+            val c2 = cache
+            val t2 = SystemClock.elapsedRealtime()
+            if (c2 != null && t2 - cacheTime < ttl) return@synchronized c2
+
+            var fresh = fetchViaBinder()
+            if (fresh != null) {
+                lastSource = SRC_BINDER
+            } else {
+                fresh = fetchViaShell()
+                if (fresh != null) lastSource = SRC_SHELL
+            }
+
+            if (fresh == null) {
+                // keep the last good list; only give up (use the estimate) after a long time
+                if (c2 != null && t2 - cacheTime < MAX_STALE_MS) c2 else null
+            } else {
+                cache = fresh
+                cacheTime = SystemClock.elapsedRealtime()
+                fresh
+            }
         }
-        val parsed = parseRecents(out)
-        cache = parsed
-        cacheTime = now
-        return parsed
     }
 
     // ---- Usage-event estimate (no Shizuku) ---------------------------------------------
