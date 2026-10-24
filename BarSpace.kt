@@ -1,10 +1,15 @@
 package com.clipsync.app
 
 import android.app.Activity
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Typeface
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.widget.ScrollView
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import com.farmerbb.taskbar.R
@@ -82,34 +87,76 @@ object BarSpace {
         ui.post { Toast.makeText(ctx, msg, Toast.LENGTH_LONG).show() }
     }
 
-    private fun dimenCmd(name: String, res: String, dp: Int): String {
+    private fun dimenCmd(user: String, name: String, res: String, dp: Int): String {
         // dimension resource: type 0x05, data = value (23.0 fixed point) in dp units
         val data = "0x" + java.lang.Long.toHexString((dp.toLong() shl 8) or 1L)
-        return "cmd overlay fabricate --target android --name $name android:dimen/$res 0x5 $data && " +
-            "cmd overlay enable com.android.shell:$name"
+        return "cmd overlay fabricate $user --target android --name $name android:dimen/$res 0x5 $data"
     }
 
-    private fun reserve(ctx: Context) {
+    /** Shows the full shell transcript so a failure can be understood (and copied). */
+    private fun showReport(activity: Activity, text: String) {
+        ui.post {
+            val tv = TextView(activity)
+            tv.text = text
+            tv.typeface = Typeface.MONOSPACE
+            tv.textSize = 11f
+            tv.setTextIsSelectable(true)
+            val pad = (16 * activity.resources.displayMetrics.density).toInt()
+            tv.setPadding(pad, pad, pad, pad)
+            val sv = ScrollView(activity)
+            sv.addView(tv)
+            AlertDialog.Builder(activity)
+                .setTitle("Reserve screen space: not accepted")
+                .setView(sv)
+                .setPositiveButton("Copy") { _, _ ->
+                    val cm = activity.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("reserve space report", text))
+                    Toast.makeText(activity, "Copied", Toast.LENGTH_SHORT).show()
+                }
+                .setNegativeButton("Close", null)
+                .show()
+        }
+    }
+
+    private fun reserve(activity: Activity) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
-            toast(ctx, "Needs Android 12 or newer")
+            toast(activity, "Needs Android 12 or newer")
             return
         }
         if (TaskSource.shizukuState() != 2) {
-            toast(ctx, "Start Shizuku and allow Taskbar first")
+            toast(activity, "Start Shizuku and allow Taskbar first")
             return
         }
-        val dp = barDp(ctx)
+        val dp = barDp(activity)
         Thread {
-            val out1 = sh(dimenCmd(NAME_HEIGHT, "navigation_bar_height", dp))
-            val out2 = sh(dimenCmd(NAME_FRAME, "navigation_bar_frame_height", dp))
-            val list = sh("cmd overlay list android") ?: ""
-            val ok = list.lines().any { it.contains("[x]") && it.contains(NAME_HEIGHT) }
+            val log = StringBuilder()
+            log.append("Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})\n")
+            log.append("${Build.MANUFACTURER} ${Build.MODEL}\n${Build.DISPLAY}\n")
+            log.append("bar height: $dp dp\n")
+
+            fun step(cmd: String): String {
+                val out = (sh(cmd) ?: "(no answer / timed out)").trim()
+                log.append("\n$ ").append(cmd).append("\n").append(if (out.isEmpty()) "(no output)" else out).append("\n")
+                return out
+            }
+
+            var ok = false
+            // first without --user, then for user 0 explicitly
+            for (user in listOf("", "--user 0")) {
+                step(dimenCmd(user, NAME_HEIGHT, "navigation_bar_height", dp))
+                step("cmd overlay enable $user com.android.shell:$NAME_HEIGHT")
+                step(dimenCmd(user, NAME_FRAME, "navigation_bar_frame_height", dp))
+                step("cmd overlay enable $user com.android.shell:$NAME_FRAME")
+                val list = step("cmd overlay list $user android")
+                ok = list.lines().any { it.contains("[x]") && it.contains(NAME_HEIGHT) }
+                if (ok) break
+            }
+
             if (ok) {
-                U.getSharedPreferences(ctx).edit().putBoolean(PREF_ON, true).apply()
-                toast(ctx, "Reserved $dp dp at the bottom. Reopen apps if they didn't move.")
+                U.getSharedPreferences(activity).edit().putBoolean(PREF_ON, true).apply()
+                toast(activity, "Reserved $dp dp at the bottom. Reopen apps if they didn't move.")
             } else {
-                val why = ((out1 ?: out2) ?: "no answer from Shizuku").trim().take(120)
-                toast(ctx, "The system did not accept it: $why")
+                showReport(activity, log.toString())
             }
         }.start()
     }
