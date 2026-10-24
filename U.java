@@ -938,8 +938,8 @@ public class U {
 
         int base = androidx.core.graphics.ColorUtils.blendARGB(tint | 0xFF000000, Color.WHITE, 0.12f);
         int inner = androidx.core.graphics.ColorUtils.setAlphaComponent(
-                androidx.core.graphics.ColorUtils.blendARGB(base, Color.WHITE, 0.10f), blurActive ? 0x66 : 0xB4);
-        int outer = androidx.core.graphics.ColorUtils.setAlphaComponent(base, blurActive ? 0x52 : 0x96);
+                androidx.core.graphics.ColorUtils.blendARGB(base, Color.WHITE, 0.10f), com.clipsync.app.BarOpacity.innerAlpha(context, blurActive));
+        int outer = androidx.core.graphics.ColorUtils.setAlphaComponent(base, com.clipsync.app.BarOpacity.outerAlpha(context, blurActive));
 
         // The lighter side of the gradient faces into the screen
         android.graphics.drawable.GradientDrawable.Orientation orientation;

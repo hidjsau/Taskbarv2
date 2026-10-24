@@ -223,6 +223,45 @@ if "pref_screen_clipsync" not in af:
         "about click",
     )
     write(AF, af)
+# 3d. Taskbar opacity slider (Appearance settings) ---------------------------
+ap = read(AP)
+if "clipsync_bar_opacity" not in ap:
+    ap = once(
+        ap,
+        r'(\n[ \t]*<PreferenceCategory android:key="dummy")',
+        lambda x: """
+    <Preference
+        android:key="clipsync_bar_opacity"
+        android:title="Taskbar opacity"
+        android:summary="Make the taskbar more see-through" />
+""" + x.group(1),
+        "opacity pref",
+    )
+    write(AP, ap)
+
+afr = read(AFR)
+if "clipsync_bar_opacity" not in afr:
+    afr = once(
+        afr,
+        r"(findPreference\(PREF_ACCENT_COLOR_PREF\)\.setOnPreferenceClickListener\(this\);)",
+        r'''\1
+        findPreference("clipsync_bar_opacity").setOnPreferenceClickListener(this);
+        findPreference("clipsync_bar_opacity").setSummary(com.clipsync.app.BarOpacity.summary(getActivity()));''',
+        "opacity listener",
+    )
+    afr = once(
+        afr,
+        r"(            case PREF_BACKGROUND_TINT_PREF:\n)",
+        r'''            case "clipsync_bar_opacity":
+                com.clipsync.app.BarOpacity.showDialog(getActivity(),
+                        () -> p.setSummary(com.clipsync.app.BarOpacity.summary(getActivity())));
+                break;
+\1''',
+        "opacity click",
+    )
+    write(AFR, afr)
+print("opacity slider ok")
+
 print("home page entry ok")
 
 # 4. U.java: make room for the divider (start) and the sync button (end) -------
