@@ -1651,32 +1651,64 @@ public class TaskbarController extends UIController {
 
         }
 
-        final float swipeThreshold = Math.max(
-                ViewConfiguration.get(context).getScaledTouchSlop() * 2,
-                context.getResources().getDisplayMetrics().density * 16
-        );
-        final float[] downY = {0};
+        // Swipe-up detection, tuned to survive system gesture navigation:
+        //  - fires as soon as the finger has moved far enough (no need to lift it)
+        //  - also fires if the system cancels the touch (it takes over near the screen edge)
+        //  - uses raw screen coordinates and only needs the drag to be mostly vertical
+        final float touchSlop = ViewConfiguration.get(context).getScaledTouchSlop();
+        final float swipeThreshold = Math.max(touchSlop * 1.2f,
+                context.getResources().getDisplayMetrics().density * 10);
+        final float[] start = {0, 0};
         final boolean visualFeedback = pref.getBoolean(PREF_VISUAL_FEEDBACK, true);
 
         layout.setOnTouchListener((v, event) -> {
-            int action = event.getAction();
+            int action = event.getActionMasked();
+
+            if(swipedUp[0]) {
+                // Gesture already handled: swallow the rest of it so no click or long press follows
+                v.setAlpha(1);
+                if(action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+                    swipedUp[0] = false;
+
+                return true;
+            }
+
+            if(action == MotionEvent.ACTION_DOWN) {
+                start[0] = event.getRawX();
+                start[1] = event.getRawY();
+            } else if(action == MotionEvent.ACTION_MOVE
+                    || action == MotionEvent.ACTION_UP
+                    || action == MotionEvent.ACTION_CANCEL) {
+                float dy = start[1] - event.getRawY();
+                float dx = Math.abs(event.getRawX() - start[0]);
+
+                if(dy > swipeThreshold && dy > dx * 1.2f) {
+                    // Dragged upward: launch in normal windowed mode instead of fullscreen
+                    swipedUp[0] = true;
+                    v.setPressed(false);
+                    v.cancelLongPress();
+                    v.setAlpha(1);
+
+                    String windowedSize = pref.getString(PREF_WINDOW_SIZE, "standard");
+                    if("fullscreen".equals(windowedSize)) windowedSize = "standard";
+
+                    U.launchApp(context, entry, windowedSize, true, false, v);
+
+                    if(action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL)
+                        swipedUp[0] = false;
+
+                    return true;
+                }
+
+                // Clearly a vertical drag: stop the taskbar's scroll view from stealing it
+                if(action == MotionEvent.ACTION_MOVE
+                        && dy > touchSlop * 0.5f && dy > dx * 1.5f
+                        && v.getParent() != null)
+                    v.getParent().requestDisallowInterceptTouchEvent(true);
+            }
 
             if(visualFeedback)
                 v.setAlpha(action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_MOVE ? 0.5f : 1);
-
-            if(action == MotionEvent.ACTION_DOWN) {
-                swipedUp[0] = false;
-                downY[0] = event.getY();
-            } else if(action == MotionEvent.ACTION_UP
-                    && downY[0] - event.getY() > swipeThreshold) {
-                // Dragged upward: launch in normal windowed mode instead of fullscreen
-                swipedUp[0] = true;
-
-                String windowedSize = pref.getString(PREF_WINDOW_SIZE, "standard");
-                if("fullscreen".equals(windowedSize)) windowedSize = "standard";
-
-                U.launchApp(context, entry, windowedSize, true, false, v);
-            }
 
             return false;
         });
